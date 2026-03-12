@@ -219,3 +219,47 @@ class BuildJob(BaseModel):
                     f"Build for kn_id={self.kn_id} did not complete within {timeout}s"
                 )
             time.sleep(poll_interval)
+
+
+# ── Agent & Conversation types ─────────────────────────────────────
+
+
+class Agent(BaseModel):
+    id: str
+    name: str
+    description: str | None = None
+    status: str = "draft"                # published / draft
+    kn_ids: list[str] = []
+    system_prompt: str | None = None
+    capabilities: list[str] = []
+    model_config_data: dict[str, Any] | None = None
+    conversation_count: int = 0
+
+
+class Conversation(BaseModel):
+    id: str
+    agent_id: str
+    title: str | None = None
+    message_count: int = 0
+    last_active: str | None = None
+
+
+class Reference(BaseModel):
+    source: str
+    content: str
+    score: float = 0.0
+
+
+class Message(BaseModel):
+    id: str
+    role: str                             # user / assistant
+    content: str
+    references: list[Reference] = []
+    timestamp: str
+
+
+class MessageChunk(BaseModel):
+    """Single chunk from a streaming response."""
+    delta: str
+    finished: bool = False
+    references: list[Reference] = []

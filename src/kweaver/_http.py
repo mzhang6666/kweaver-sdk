@@ -5,7 +5,8 @@ from __future__ import annotations
 import copy
 import logging
 import time
-from typing import Any
+import json as _json
+from typing import Any, Iterator
 
 import httpx
 
@@ -143,6 +144,37 @@ class HttpClient:
 
     def delete(self, path: str, *, headers: dict[str, str] | None = None) -> Any:
         return self.request("DELETE", path, headers=headers)
+
+    def stream_post(
+        self,
+        path: str,
+        *,
+        json: Any = None,
+        headers: dict[str, str] | None = None,
+        timeout: float | None = None,
+    ) -> Iterator[dict[str, Any]]:
+        """POST with streaming response — yields parsed JSON lines/SSE events."""
+        merged_headers = self._build_headers(headers)
+        self._log("POST", path, json)
+
+        with self._client.stream(
+            "POST", path, json=json, headers=merged_headers, timeout=timeout,
+        ) as resp:
+            if resp.status_code >= 400:
+                resp.read()
+                raise_for_status(resp)
+            for line in resp.iter_lines():
+                line = line.strip()
+                if not line:
+                    continue
+                if line.startswith("data: "):
+                    line = line[6:]
+                if line == "[DONE]":
+                    break
+                try:
+                    yield _json.loads(line)
+                except Exception:
+                    continue
 
     def close(self) -> None:
         self._client.close()

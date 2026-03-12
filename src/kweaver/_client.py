@@ -8,6 +8,8 @@ import httpx
 
 from kweaver._auth import AuthProvider, TokenAuth
 from kweaver._http import HttpClient
+from kweaver.resources.agents import AgentsResource
+from kweaver.resources.conversations import ConversationsResource
 from kweaver.resources.datasources import DataSourcesResource
 from kweaver.resources.dataviews import DataViewsResource
 from kweaver.resources.knowledge_networks import KnowledgeNetworksResource
@@ -58,6 +60,8 @@ class ADPClient:
         self.object_types = ObjectTypesResource(self._http)
         self.relation_types = RelationTypesResource(self._http)
         self.query = QueryResource(self._http)
+        self.agents = AgentsResource(self._http)
+        self.conversations = ConversationsResource(self._http)
 
     def close(self) -> None:
         self._http.close()
