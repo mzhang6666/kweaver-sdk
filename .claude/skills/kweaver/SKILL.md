@@ -12,284 +12,183 @@ requires:
   bins: [python]
 ---
 
-# KWeaver — ADP 知识网络与 Decision Agent 技能
+# KWeaver CLI
 
-通过 kweaver SDK（Python API）或 kweaver CLI 操作 ADP 平台的知识网络和 Decision Agent。
+KWeaver/ADP 平台的命令行工具，覆盖认证、数据源管理、知识网络管理与查询、Action 执行、Agent 对话六大能力。
 
-## 两种调用方式
+## 安装
 
-| 方式 | 适用场景 | 说明 |
-|------|---------|------|
-| **Python SDK** | 复杂逻辑、多步编排、流式处理 | 写 Python 脚本，通过 Bash 执行 |
-| **kweaver CLI** | 简单查询、快速操作 | 直接 Bash 执行 `kweaver <cmd>` |
+```bash
+pip install kweaver-sdk[cli]
+```
 
-优先用 CLI 完成简单操作；需要复杂编排时用 SDK。
+或从源码安装：
 
-## 环境准备
+```bash
+pip install -e "/path/to/kweaver-sdk[cli]"
+```
+
+需 Python >= 3.10。
+
+## 使用前提
+
+**使用任何命令前，必须先认证。** 若用户未认证，提示先执行 `kweaver auth login <platform-url>`。
 
 **重要规则**:
 1. 如果环境变量 `KWEAVER_PYTHON` 已设置，用它作为 Python 解释器路径；否则用 `python`
-2. 客户端初始化代码必须**原样复制**，不要修改参数名或尝试其他值
-3. **所有环境变量已预配置，直接执行代码即可。禁止提前检查环境变量是否存在，禁止询问用户提供密码或 Token。**
+2. **所有环境变量已预配置，直接执行命令即可。禁止提前检查环境变量是否存在，禁止询问用户提供密码或 Token。**
 
 ### 认证优先级
 
-SDK 按以下顺序尝试认证（无需用户干预）：
+CLI 按以下顺序尝试认证（无需用户干预）：
 
 1. **ConfigAuth**（推荐）— 读取 `~/.kweaver/` 凭据（与 kweaverc CLI 共享），自动刷新 Token
 2. **PasswordAuth** — 通过 `ADP_USERNAME` + `ADP_PASSWORD` 环境变量
 3. **TokenAuth** — 通过 `ADP_TOKEN` 环境变量
 
-### SDK 客户端初始化（直接复制使用，禁止修改）
-
-```python
-import os
-from kweaver import ADPClient, ConfigAuth, TokenAuth, PasswordAuth
-from kweaver.skills import (
-    ConnectDbSkill, BuildKnSkill, LoadKnContextSkill, QueryKnSkill,
-    DiscoverAgentsSkill, ChatAgentSkill, ExecuteActionSkill,
-)
-
-# 优先 ConfigAuth（零配置），fallback 到 PasswordAuth / TokenAuth
-base_url = os.environ.get("ADP_BASE_URL")
-username = os.environ.get("ADP_USERNAME")
-password = os.environ.get("ADP_PASSWORD")
-token = os.environ.get("ADP_TOKEN")
-bd = os.environ.get("ADP_BUSINESS_DOMAIN")
-
-try:
-    # ConfigAuth: 读取 ~/.kweaver/ 凭据（kweaverc 或 kweaver auth login 写入）
-    client = ADPClient(auth=ConfigAuth(), business_domain=bd)
-except Exception:
-    if username and password:
-        auth = PasswordAuth(base_url, username, password)
-    elif token:
-        auth = TokenAuth(token)
-    else:
-        raise RuntimeError("无法认证: 请先运行 'kweaver auth login' 或设置 ADP_TOKEN 环境变量")
-    client = ADPClient(base_url=base_url, auth=auth, business_domain=bd)
-```
+环境变量 `ADP_BASE_URL` 和 `ADP_BUSINESS_DOMAIN` 用于指定平台地址和业务域。
 
 ---
 
-## CLI 命令速查
+## 命令速查
 
-### 认证
+### 认证 (auth)
 
 ```bash
-kweaver auth login <platform-url>             # 浏览器 OAuth2 登录
-kweaver auth login <platform-url> --alias prod  # 登录并设别名
-kweaver auth status                            # 当前认证状态
-kweaver auth list                              # 已保存的平台
-kweaver auth use <platform|alias>              # 切换平台
-kweaver auth logout                            # 登出
+kweaver auth login <platform-url>                # 浏览器 OAuth2 登录
+kweaver auth login <platform-url> --alias prod   # 登录并设别名
+kweaver auth status                              # 当前认证状态
+kweaver auth list                                # 已保存的平台
+kweaver auth use <platform|alias>                # 切换平台
+kweaver auth logout                              # 登出
 ```
 
-### 知识网络
+### 数据源 (ds)
+
+```bash
+kweaver ds connect <db_type> <host> <port> <database> --account <user> --password <pass> [--schema <schema>] [--name <ds_name>]
+kweaver ds list [--keyword <text>] [--type <db_type>]
+kweaver ds get <datasource_id>
+kweaver ds delete <datasource_id>
+kweaver ds tables <datasource_id> [--keyword <text>]
+```
+
+### 知识网络 (kn)
 
 ```bash
 kweaver kn list [--name <filter>]
 kweaver kn get <kn-id>
 kweaver kn export <kn-id>
-kweaver kn build <kn-id> [--no-wait]
+kweaver kn create <datasource_id> --name <kn_name> [--tables <t1,t2,...>] [--build/--no-build] [--timeout N]
+kweaver kn build <kn-id> [--no-wait] [--timeout N]
 kweaver kn delete <kn-id>
 ```
 
-### 查询
+### 查询 (query)
 
 ```bash
-kweaver query search <kn-id> "<query>"
+kweaver query search <kn-id> "<query>" [--max-concepts N]
 kweaver query instances <kn-id> <ot-id> [--condition '<json>'] [--limit N]
 kweaver query kn-search <kn-id> "<query>" [--only-schema]
+kweaver query subgraph <kn-id> --start-type <ot_name> --start-condition '<json>' --path <rt1,rt2,...>
 ```
 
-### Action
+### Action (action)
 
 ```bash
-kweaver action query <kn-id> <at-id>
-kweaver action execute <kn-id> <at-id> [--params '<json>'] [--no-wait]
+kweaver action query <kn-id> <action_type_id>
+kweaver action execute <kn-id> [<action_type_id>] [--action-name <name>] [--params '<json>'] [--no-wait] [--timeout N]
 kweaver action logs <kn-id> [--limit N]
 kweaver action log <kn-id> <log-id>
 ```
 
-### Agent
+> `execute` 可通过 `--action-name` 按名称查找 action_type_id（内部调用 kn-search）。
+
+### Agent (agent)
 
 ```bash
 kweaver agent list [--keyword <text>]
 kweaver agent chat <agent-id> -m "<message>" [--conversation-id <id>]
+kweaver agent sessions <agent-id>
+kweaver agent history <conversation-id> [--limit N]
 ```
 
-### 通用 API 调用
+### 通用 API 调用 (call)
 
 ```bash
-kweaver call <path>                            # GET（自动注入认证）
-kweaver call <path> -X POST -d '<json>'        # POST
+kweaver call <path>                              # GET（自动注入认证）
+kweaver call <path> -X POST -d '<json>'          # POST
 ```
 
 ---
 
-## SDK Skill 详解
+## 操作手册
 
-根据用户意图，选择下面 **一个或多个** 操作组合执行。
+### 1. 从零构建知识网络
 
-### 1. connect_db — 连接数据库
+```bash
+# 连接数据库，获取 datasource_id 和表列表
+kweaver ds connect mysql 10.0.1.100 3306 erp_prod --account readonly --password xxx
 
-**何时用**: 用户想接入一个数据库、查看库里有哪些表。
+# 用 datasource_id 创建知识网络（自动构建）
+kweaver kn create <datasource_id> --name erp_prod --tables products,inventory
 
-```python
-result = ConnectDbSkill(client).run(
-    db_type="mysql",       # mysql|postgresql|oracle|sqlserver|clickhouse|...
-    host="10.0.1.100",
-    port=3306,
-    database="erp_prod",
-    account="readonly",
-    password="xxx",
-)
-# 返回: { datasource_id, tables: [{ name, columns: [{ name, type, comment }] }] }
+# 查看知识网络结构
+kweaver kn export <kn-id>
+
+# 语义搜索
+kweaver query search <kn-id> "高库存的产品"
 ```
 
-### 2. build_kn — 构建知识网络
+### 2. 探索已有知识网络
 
-**何时用**: 用户想把数据库中的表建模为知识网络。需要先 connect_db 拿到 datasource_id。
+```bash
+# 列出所有知识网络
+kweaver kn list
 
-```python
-result = BuildKnSkill(client).run(
-    datasource_id="<connect_db 返回的 ID>",
-    network_name="erp_prod",
-    tables=["products", "inventory", "suppliers"],
-    relations=[{
-        "name": "产品_库存",
-        "from_table": "products", "to_table": "inventory",
-        "from_field": "material_number", "to_field": "material_code",
-    }],
-)
-# 返回: { kn_id, kn_name, object_types, relation_types, status }
+# 导出某个知识网络的完整结构（对象类型、关系类型、属性）
+kweaver kn export <kn-id>
+
+# 查看某个对象类型的实例数据
+kweaver query instances <kn-id> <ot-id> --limit 10
 ```
 
-### 3. load_kn_context — 查看知识网络结构与数据
+### 3. Agent 对话
 
-**何时用**: 用户想了解有哪些知识网络、某个网络的 Schema、或某个对象类的实例数据。
+```bash
+# 列出可用 Agent
+kweaver agent list
 
-```python
-skill = LoadKnContextSkill(client)
+# 与 Agent 对话（自动创建会话）
+kweaver agent chat <agent-id> -m "华东仓库库存情况"
 
-# 3a. overview — 列出所有知识网络
-result = skill.run(mode="overview")
-result = skill.run(mode="overview", keyword="erp")
+# 查看该 Agent 的所有会话
+kweaver agent sessions <agent-id>
 
-# 3b. schema — 查看某个知识网络的完整结构
-result = skill.run(mode="schema", kn_name="erp_prod")
-result = skill.run(mode="schema", kn_name="erp_prod", include_samples=True, sample_size=3)
-
-# 3c. instances — 查看某个对象类的实例
-result = skill.run(mode="instances", kn_name="erp_prod", object_type="products", limit=10)
+# 查看某个会话的历史消息
+kweaver agent history <conversation-id>
 ```
 
-### 4. query_kn — 查询知识网络
+### 4. 执行 Action
 
-**何时用**: 用户有具体的业务问题要查询（语义搜索、精确查询、关联查询）。
-
-```python
-skill = QueryKnSkill(client)
-
-# 4a. search — 语义搜索
-result = skill.run(kn_id="<id>", mode="search", query="高库存的产品")
-
-# 4b. instances — 精确查询某类对象
-result = skill.run(
-    kn_id="<id>", mode="instances", object_type="products",
-    conditions={"field": "status", "operation": "eq", "value": "active"},
-    limit=20,
-)
-
-# 4c. subgraph — 沿关系路径做关联查询
-result = skill.run(
-    kn_id="<id>", mode="subgraph",
-    start_object="products",
-    start_condition={"field": "category", "operation": "eq", "value": "电子"},
-    path=["inventory", "suppliers"],
-)
-```
-
-### 5. discover_agents — 发现 Decision Agent
-
-**何时用**: 用户想知道平台上有哪些可用的 Agent。
-
-```python
-skill = DiscoverAgentsSkill(client)
-
-# 5a. list — 列出所有已发布的 Agent
-result = skill.run(mode="list")
-result = skill.run(mode="list", keyword="供应链")
-
-# 5b. detail — 查看某个 Agent 的详情
-result = skill.run(mode="detail", agent_name="供应链助手")
-```
-
-### 6. chat_agent — 与 Decision Agent 对话
-
-**何时用**: 用户想跟某个 Agent 聊天、问业务问题。
-
-```python
-skill = ChatAgentSkill(client)
-
-# 6a. ask — 向 Agent 提问（自动创建会话）
-result = skill.run(mode="ask", agent_name="供应链助手", question="华东仓库库存情况")
-# 返回: { answer, conversation_id, references }
-
-# 6b. ask — 续接已有会话（多轮对话）
-result = skill.run(
-    mode="ask", agent_name="供应链助手",
-    question="和上个月相比呢？",
-    conversation_id="<上一轮返回的 conversation_id>",
-)
-
-# 6c. ask — 流式输出
-result = skill.run(mode="ask", agent_name="供应链助手", question="详细分析", stream=True)
-```
-
-### 7. execute_action — 执行 Action
-
-**何时用**: 用户明确要求执行某个 Action（有副作用，需用户确认）。
-
-```python
-skill = ExecuteActionSkill(client)
-
-# 按名称执行（自动查找 action_type_id）
-result = skill.run(kn_name="erp_prod", action_name="库存盘点")
-# 返回: { execution_id, status, result }
+```bash
+# 按名称执行 Action（自动查找 action_type_id）
+kweaver action execute <kn-id> --action-name "库存盘点"
 
 # 按 ID 执行，传入参数
-result = skill.run(
-    kn_id="<id>", action_type_id="<at_id>",
-    params={"warehouse": "华东"},
-    timeout=600,
-)
+kweaver action execute <kn-id> <action_type_id> --params '{"warehouse": "华东"}'
 
-# 异步执行（不等待完成）
-result = skill.run(kn_id="<id>", action_type_id="<at_id>", wait=False)
+# 查看执行日志
+kweaver action logs <kn-id>
+kweaver action log <kn-id> <log-id>
 ```
 
 ---
-
-## 操作编排指南
-
-典型的多步流程：
-
-1. **从零构建**: connect_db → build_kn → load_kn_context(schema) → query_kn
-2. **探索已有**: load_kn_context(overview) → load_kn_context(schema) → query_kn
-3. **直接查询**: 如果用户给了明确的 kn_id/kn_name，直接 query_kn
-4. **发现 Agent**: discover_agents(list) → discover_agents(detail) → chat_agent(ask)
-5. **Agent 多轮对话**: chat_agent(ask) → chat_agent(ask, conversation_id=...) 续接
-6. **执行 Action**: load_kn_context(schema) → execute_action(kn_name, action_name)
 
 ## 注意事项
 
-- 所有 Skill 操作返回 dict。如果 `result.get("error")` 为 True，向用户说明错误原因。
-- kn_name 可以替代 kn_id 使用（SDK 内部自动按名称查找）。
-- agent_name 可以替代 agent_id 使用（SDK 内部自动按名称查找）。
-- 不要向用户暴露 dataview_id、ot_id 等内部 ID，用名称展示即可。
-- 构建知识网络(build_kn)可能需要等待一段时间，提前告知用户。
-- execute_action 有副作用，仅在用户明确请求时执行，执行前向用户确认。
 - **不要自行猜测或枚举 business_domain 值**，只使用环境变量中配置的值。
 - 如果 API 返回 "Bad Request"，最常见原因是 Token 过期或 business_domain 未设置。
+- `execute_action` 有副作用，仅在用户明确请求时执行，执行前向用户确认。
+- 构建知识网络 (`kn create` / `kn build`) 可能需要等待一段时间，提前告知用户。
+- 所有命令输出 JSON 格式，可用 `jq` 进一步处理。
