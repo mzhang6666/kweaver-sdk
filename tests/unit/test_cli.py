@@ -447,3 +447,32 @@ def test_ds_delete(runner):
         result = runner.invoke(cli, ["ds", "delete", "ds1"], input="y\n")
         assert result.exit_code == 0
         client.datasources.delete.assert_called_once_with("ds1")
+
+
+def test_ds_tables(runner):
+    with patch("kweaver.cli.ds.make_client") as mock_make:
+        client = _mock_client()
+        mock_table = MagicMock()
+        mock_col = MagicMock()
+        mock_col.name = "id"
+        mock_col.type = "integer"
+        mock_col.comment = None
+        mock_table.name = "users"
+        mock_table.columns = [mock_col]
+        client.datasources.list_tables.return_value = [mock_table]
+        mock_make.return_value = client
+        result = runner.invoke(cli, ["ds", "tables", "ds1"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data[0]["name"] == "users"
+        assert data[0]["columns"][0]["name"] == "id"
+
+
+def test_ds_tables_with_keyword(runner):
+    with patch("kweaver.cli.ds.make_client") as mock_make:
+        client = _mock_client()
+        client.datasources.list_tables.return_value = []
+        mock_make.return_value = client
+        result = runner.invoke(cli, ["ds", "tables", "ds1", "--keyword", "user"])
+        assert result.exit_code == 0
+        client.datasources.list_tables.assert_called_once_with("ds1", keyword="user")

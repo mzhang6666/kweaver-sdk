@@ -41,3 +41,23 @@ def delete_ds(datasource_id: str) -> None:
     client = make_client()
     client.datasources.delete(datasource_id)
     click.echo(f"Deleted {datasource_id}")
+
+
+@ds_group.command("tables")
+@click.argument("datasource_id")
+@click.option("--keyword", default=None, help="Filter tables by keyword.")
+@handle_errors
+def tables(datasource_id: str, keyword: str | None) -> None:
+    """List tables with columns for a datasource."""
+    client = make_client()
+    tables = client.datasources.list_tables(datasource_id, keyword=keyword)
+    pp([
+        {
+            "name": t.name,
+            "columns": [
+                {"name": c.name, "type": c.type, "comment": c.comment}
+                for c in t.columns
+            ],
+        }
+        for t in tables
+    ])
