@@ -17,6 +17,26 @@ kweaver auth logout
 
 ---
 
+## 数据源管理
+
+连接数据库：
+
+```bash
+kweaver ds connect --type mysql --host 10.0.1.100 --port 3306 \
+  --database erp_prod --account readonly --password xxx
+```
+
+查看数据源：
+
+```bash
+kweaver ds list
+kweaver ds get <ds-id>
+kweaver ds tables <ds-id>
+kweaver ds delete <ds-id>
+```
+
+---
+
 ## 知识网络管理
 
 列表：
@@ -31,6 +51,14 @@ kweaver kn list --name erp
 ```bash
 kweaver kn get <kn-id>
 kweaver kn export <kn-id>
+```
+
+创建：
+
+```bash
+kweaver kn create --name erp_prod --ds-id <datasource-id> \
+  --tables products,inventory,suppliers \
+  --relations '[{"name":"产品_库存","from_table":"products","to_table":"inventory","from_field":"material_number","to_field":"material_code"}]'
 ```
 
 构建：
@@ -85,6 +113,14 @@ kweaver query kn-search <kn-id> "products"
 kweaver query kn-search <kn-id> "products" --only-schema
 ```
 
+子图查询：
+
+```bash
+kweaver query subgraph <kn-id> --start <ot-id> \
+  --condition '{"field":"category","operation":"eq","value":"电子"}' \
+  --path inventory,suppliers
+```
+
 ---
 
 ## Action
@@ -102,6 +138,7 @@ kweaver action execute <kn-id> <at-id>                           # 等待完成
 kweaver action execute <kn-id> <at-id> --no-wait                 # 异步
 kweaver action execute <kn-id> <at-id> --params '{"warehouse":"华东"}'
 kweaver action execute <kn-id> <at-id> --timeout 600
+kweaver action execute <kn-id> --action-name "库存盘点"           # 按名称执行
 ```
 
 查看日志：
@@ -135,6 +172,13 @@ kweaver agent chat <agent-id> -m "华东仓库库存情况如何？"
 kweaver agent chat <agent-id> -m "和上个月相比呢？" --conversation-id <conversation-id>
 ```
 
+查看历史会话：
+
+```bash
+kweaver agent sessions <agent-id>
+kweaver agent history <conversation-id> --limit 50
+```
+
 ---
 
 ## 通用 API 调用
@@ -153,55 +197,47 @@ kweaver call /api/ontology-manager/v1/knowledge-networks/<kn-id> -X DELETE
 
 ---
 
-## SDK 端到端示例
+## 端到端示例
 
 ### 从零构建知识网络
 
-```python
+```bash
 # Step 1: 连接数据库
-result = ConnectDbSkill(client).run(
-    db_type="mysql", host="10.0.1.100", port=3306,
-    database="erp_prod", account="readonly", password="xxx",
-)
-ds_id = result["datasource_id"]
+kweaver ds connect --type mysql --host 10.0.1.100 --port 3306 \
+  --database erp_prod --account readonly --password xxx
+# -> 记录返回的 datasource_id
 
-# Step 2: 构建知识网络
-result = BuildKnSkill(client).run(
-    datasource_id=ds_id, network_name="erp_prod",
-    tables=["products", "inventory", "suppliers"],
-    relations=[{
-        "name": "产品_库存",
-        "from_table": "products", "to_table": "inventory",
-        "from_field": "material_number", "to_field": "material_code",
-    }],
-)
-kn_id = result["kn_id"]
+# Step 2: 创建知识网络
+kweaver kn create --name erp_prod --ds-id <datasource-id> \
+  --tables products,inventory,suppliers \
+  --relations '[{"name":"产品_库存","from_table":"products","to_table":"inventory","from_field":"material_number","to_field":"material_code"}]'
+# -> 记录返回的 kn_id
 
-# Step 3: 查看 Schema
-result = LoadKnContextSkill(client).run(mode="schema", kn_name="erp_prod")
+# Step 3: 构建知识网络
+kweaver kn build <kn-id>
 
-# Step 4: 查询数据
-result = QueryKnSkill(client).run(kn_id=kn_id, mode="search", query="高库存的产品")
+# Step 4: 查看 Schema
+kweaver kn export <kn-id>
+
+# Step 5: 查询数据
+kweaver query search <kn-id> "高库存的产品"
 ```
 
 ### Agent 多轮对话
 
-```python
-skill = ChatAgentSkill(client)
-
+```bash
 # 首轮
-result = skill.run(mode="ask", agent_name="供应链助手", question="华东仓库库存情况")
-conv_id = result["conversation_id"]
+kweaver agent chat <agent-id> -m "华东仓库库存情况"
+# -> 记录返回的 conversation_id
 
 # 续聊
-result = skill.run(mode="ask", agent_name="供应链助手",
-                   question="和上个月相比呢？", conversation_id=conv_id)
+kweaver agent chat <agent-id> -m "和上个月相比呢？" --conversation-id <conversation-id>
 ```
 
 ### 执行 Action
 
-```python
-skill = ExecuteActionSkill(client)
-result = skill.run(kn_name="erp_prod", action_name="库存盘点")
-print(f"状态: {result['status']}, 结果: {result.get('result')}")
+```bash
+# 按名称执行
+kweaver action execute <kn-id> --action-name "库存盘点"
+# -> 返回 execution_id, status, result
 ```

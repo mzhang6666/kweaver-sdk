@@ -1,306 +1,142 @@
 # KWeaver SDK
 
-让 AI 智能体（Claude Code、GPT、自定义 Agent 等）通过 Skill 访问 KWeaver / ADP 平台的知识网络与 Decision Agent。同时提供 `kweaver` CLI 命令供终端用户直接操作。
+让 AI 智能体（Claude Code、GPT、自定义 Agent 等）通过 `kweaver` CLI 命令访问 KWeaver / ADP 平台的知识网络与 Decision Agent。同时提供 Python SDK 供程序化集成。
 
 ## 这个项目解决什么问题
 
-KWeaver (ADP) 平台提供了知识网络构建、语义搜索、Decision Agent 对话等能力，但这些能力藏在复杂的 REST API 背后。本 SDK 将它们封装为 **7 个 Skill**，每个 Skill 是一个 `run(**kwargs) -> dict` 的简单调用，智能体无需了解底层 API 细节即可完成操作。
+KWeaver (ADP) 平台提供了知识网络构建、语义搜索、Decision Agent 对话等能力，但这些能力藏在复杂的 REST API 背后。本项目提供 **`kweaver` CLI 命令行工具**，智能体直接调用 shell 命令即可完成操作，无需了解底层 API 细节。
 
 ## 前置条件
 
 1. **Python >= 3.10**
 2. **ADP 平台账号**
-3. 安装 SDK：
+3. 安装：
 
 ```bash
-pip install -e .           # 核心 SDK
-pip install -e ".[cli]"    # 含 CLI 命令行工具（可选）
+pip install kweaver-sdk[cli]    # CLI + SDK
 ```
 
-## 接入步骤
-
-### 第 1 步：认证
+## 认证
 
 提供四种认证方式，按推荐顺序：
 
-#### 方式 A（推荐）：用 kweaverc 或 kweaver CLI 登录，SDK 共享凭据
+### 方式 A（推荐）：CLI 登录
 
 ```bash
-# 用 kweaverc（TypeScript CLI）登录
-kweaverc auth https://your-adp-instance.com
-
-# 或用 kweaver（Python CLI）登录
 kweaver auth login https://your-adp-instance.com
+kweaver auth login https://your-adp-instance.com --alias prod  # 设别名
 ```
 
-登录后凭据存储在 `~/.kweaver/`，SDK 通过 `ConfigAuth` 自动读取，无需配置环境变量：
+登录后凭据存储在 `~/.kweaver/`，所有命令自动使用。与 kweaverc (TypeScript CLI) 共享凭据。
 
-```python
-from kweaver import ADPClient, ConfigAuth
-
-client = ADPClient(
-    auth=ConfigAuth(),                   # 自动读取 ~/.kweaver/ 凭据，自动刷新
-    business_domain="bd_public",         # 必填
-)
-```
-
-也可以指定平台（多平台场景）：
-
-```python
-client = ADPClient(auth=ConfigAuth(platform="prod"), business_domain="bd_public")
-```
-
-#### 方式 B：用户名密码（程序化 / CI 环境）
+### 方式 B：环境变量
 
 ```bash
 export ADP_BASE_URL="https://your-adp-instance.com"
 export ADP_BUSINESS_DOMAIN="bd_public"
-export ADP_USERNAME="user@example.com"
-export ADP_PASSWORD="your-password"
-```
-
-```python
-from kweaver import ADPClient, PasswordAuth
-
-auth = PasswordAuth(base_url, username, password)  # 依赖 Playwright
-client = ADPClient(base_url=base_url, auth=auth, business_domain="bd_public")
-```
-
-> 方式 B 依赖 Playwright：`pip install playwright && playwright install chromium`
-
-#### 方式 C：静态 Token（临时调试）
-
-```bash
-export ADP_BASE_URL="https://your-adp-instance.com"
-export ADP_BUSINESS_DOMAIN="bd_public"
-export ADP_TOKEN="Bearer ory_at_xxxxx"
-```
-
-```python
-from kweaver import ADPClient, TokenAuth
-
-client = ADPClient(base_url=base_url, auth=TokenAuth(token), business_domain="bd_public")
+export ADP_TOKEN="Bearer ory_at_xxxxx"    # 或 ADP_USERNAME + ADP_PASSWORD
 ```
 
 > **注意**: `ADP_BUSINESS_DOMAIN` 是必填项。不传或传错会导致 API 返回空结果或 Bad Request。
 
-### 第 3 步：使用 Skill
-
-所有 Skill 遵循相同模式：`Skill(client).run(**kwargs) -> dict`。
-
-出错时不抛异常，而是返回 `{"error": True, "message": "..."}`，智能体可以直接将 message 展示给用户。
-
 ---
 
-## 7 个 Skill
+## CLI 命令
 
-### 1. discover_agents — 发现平台上的 Agent
+### 数据源管理
 
-> "有哪些 Agent？" / "供应链助手是做什么的？"
+```bash
+# 连接数据库：测试连通性、注册、发现表
+kweaver ds connect mysql 10.0.1.100 3306 erp_prod \
+    --account readonly --password xxx
+# -> {"datasource_id": "ds_01", "tables": [...]}
 
-```python
-from kweaver.skills import DiscoverAgentsSkill
-skill = DiscoverAgentsSkill(client)
-
-# 列出已发布的 Agent
-result = skill.run(mode="list")
-result = skill.run(mode="list", keyword="供应链")
-# -> {"agents": [{"id": "...", "name": "供应链助手", "description": "...", "status": "published", ...}]}
-
-# 查看某个 Agent 的详情
-result = skill.run(mode="detail", agent_name="供应链助手")
-# -> {"agent": {"name": "供应链助手", "knowledge_networks": [...], "capabilities": [...], ...}}
+kweaver ds list [--keyword <filter>] [--type <db-type>]
+kweaver ds get <datasource-id>
+kweaver ds delete <datasource-id>
+kweaver ds tables <datasource-id> [--keyword <filter>]
 ```
 
-### 2. chat_agent — 与 Agent 对话
+### 知识网络
 
-> "问一下供应链助手，华东仓库库存情况如何？"
+```bash
+# 从数据源创建知识网络（自动检测主键/显示键）
+kweaver kn create <datasource-id> --name 供应链 \
+    [--tables orders,products] [--no-build] [--timeout 600]
+# -> {"kn_id": "kn_abc", "object_types": [...], "status": "completed"}
 
-```python
-from kweaver.skills import ChatAgentSkill
-skill = ChatAgentSkill(client)
-
-# 首次提问（自动创建会话）
-result = skill.run(mode="ask", agent_name="供应链助手", question="华东仓库库存情况如何？")
-# -> {
-#     "answer": "华东仓库当前库存充足...",
-#     "conversation_id": "conv_xxx",
-#     "references": [{"source": "库存表", "content": "1200件", "score": 0.95}]
-# }
-
-# 多轮对话 — 传入上一轮返回的 conversation_id
-result = skill.run(
-    mode="ask", agent_name="供应链助手",
-    question="和上个月相比呢？",
-    conversation_id=result["conversation_id"],
-)
+kweaver kn list [--name <filter>]
+kweaver kn get <kn-id>
+kweaver kn export <kn-id>              # 导出完整定义（对象类型、关系类型、属性）
+kweaver kn build <kn-id> [--no-wait]
+kweaver kn delete <kn-id>
 ```
 
-也支持 `agent_id=` 直接传 ID，以及 `stream=True` 流式。
+### 查询
 
-### 3. load_kn_context — 浏览知识网络结构与数据
-
-> "有哪些知识网络？" / "erp_prod 里有什么表？" / "看看 products 的数据"
-
-```python
-from kweaver.skills import LoadKnContextSkill
-skill = LoadKnContextSkill(client)
-
-# 列出所有知识网络
-result = skill.run(mode="overview")
-# -> {"knowledge_networks": [{"id": "kn_01", "name": "erp_prod", "object_type_count": 5, ...}]}
-
-# 查看 schema（对象类型 + 关系类型 + 属性）
-result = skill.run(mode="schema", kn_name="erp_prod")
-result = skill.run(mode="schema", kn_name="erp_prod", include_samples=True, sample_size=3)
-# -> {"kn_name": "erp_prod", "object_types": [...], "relation_types": [...]}
-
-# 浏览某个对象类型的实例数据
-result = skill.run(mode="instances", kn_name="erp_prod", object_type="products", limit=10)
-# -> {"data": [{...}], "total_count": 1200, "has_more": true, "object_type_schema": {...}}
+```bash
+kweaver query search <kn-id> "高库存的产品"
+kweaver query instances <kn-id> <ot-id> [--condition '<json>'] [--limit N]
+kweaver query kn-search <kn-id> "<query>" [--only-schema]
+kweaver query subgraph <kn-id> \
+    --start-type products \
+    --start-condition '{"field":"category","operation":"eq","value":"电子"}' \
+    --path has_inventory,belongs_to_supplier
 ```
 
-### 4. query_kn — 查询知识网络
+### Action
 
-> "查一下高库存的产品" / "status=active 的订单有哪些？"
-
-```python
-from kweaver.skills import QueryKnSkill
-skill = QueryKnSkill(client)
-
-# 语义搜索 — 不确定查什么时用
-result = skill.run(kn_id="<id>", mode="search", query="高库存的产品")
-
-# 精确查询 — 按条件过滤某类对象
-result = skill.run(
-    kn_id="<id>", mode="instances", object_type="products",
-    conditions={"field": "status", "operation": "eq", "value": "active"},
-    limit=20,
-)
-
-# 子图查询 — 沿关系路径关联查询
-result = skill.run(
-    kn_id="<id>", mode="subgraph",
-    start_object="products",
-    start_condition={"field": "category", "operation": "eq", "value": "电子"},
-    path=["inventory", "suppliers"],
-)
+```bash
+kweaver action query <kn-id> <at-id>
+kweaver action execute <kn-id> <at-id> [--params '<json>'] [--no-wait]
+kweaver action execute <kn-id> --action-name 库存盘点   # 按名称查找
+kweaver action logs <kn-id> [--limit N]
+kweaver action log <kn-id> <log-id>
 ```
 
-### 5. connect_db — 连接数据库
+### Agent
 
-> "帮我把这个 MySQL 接进来"
-
-```python
-from kweaver.skills import ConnectDbSkill
-skill = ConnectDbSkill(client)
-
-result = skill.run(
-    db_type="mysql",       # mysql | postgresql | oracle | sqlserver | clickhouse | ...
-    host="10.0.1.100",
-    port=3306,
-    database="erp_prod",
-    account="readonly",
-    password="xxx",
-)
-# -> {"datasource_id": "ds_01", "tables": [{"name": "orders", "columns": [...]}, ...]}
+```bash
+kweaver agent list [--keyword <text>]
+kweaver agent chat <agent-id> -m "华东仓库库存情况"
+kweaver agent chat <agent-id> -m "和上月比呢？" --conversation-id <id>
+kweaver agent sessions <agent-id>       # 列出会话
+kweaver agent history <conversation-id> # 查看消息历史
 ```
 
-### 6. execute_action — 执行知识网络中的 Action
+### 通用 API 调用
 
-> "执行一下库存盘点" / "跑那个数据同步 Action"
-
-```python
-from kweaver.skills import ExecuteActionSkill
-skill = ExecuteActionSkill(client)
-
-# 按名称执行（自动查找 action_type_id）
-result = skill.run(kn_name="erp_prod", action_name="库存盘点")
-# -> {"execution_id": "exec_xxx", "status": "completed", "result": {...}}
-
-# 按 ID 执行，传入参数
-result = skill.run(
-    kn_id="<id>", action_type_id="<at_id>",
-    params={"warehouse": "华东"},
-    timeout=600,
-)
-
-# 异步执行（不等待完成）
-result = skill.run(kn_id="<id>", action_type_id="<at_id>", wait=False)
-# -> {"execution_id": "exec_xxx", "status": "pending"}
+```bash
+kweaver call /api/ontology-manager/v1/knowledge-networks
+kweaver call /api/test -X POST -d '{"key":"val"}'
 ```
-
-### 7. build_kn — 构建知识网络
-
-> "把这几张表建成知识网络"
-
-```python
-from kweaver.skills import BuildKnSkill
-skill = BuildKnSkill(client)
-
-result = skill.run(
-    datasource_id="<connect_db 返回的 datasource_id>",
-    network_name="供应链",
-    tables=["orders", "products", "suppliers"],     # 可选，不传则全部纳入
-    relations=[{                                     # 可选，定义表间关系
-        "name": "订单包含产品",
-        "from_table": "orders", "from_field": "product_id",
-        "to_table": "products", "to_field": "id",
-    }],
-)
-# -> {"kn_id": "kn_abc", "kn_name": "供应链", "object_types": [...], "status": "completed"}
-```
-
-构建可能需要数十秒到数分钟，Skill 内部会自动等待完成。
 
 ---
 
 ## 典型流程
 
-| 场景 | Skill 调用顺序 |
+| 场景 | CLI 命令 |
 |---|---|
-| 探索已有知识网络 | `load_kn_context(overview)` → `load_kn_context(schema)` → `query_kn` |
-| 与 Agent 对话 | `discover_agents(list)` → `chat_agent(ask)` → `chat_agent(ask, conversation_id=...)` |
-| 从零构建知识网络 | `connect_db` → `build_kn` → `load_kn_context(schema)` → `query_kn` |
-| 执行 Action | `load_kn_context(schema)` → `execute_action(kn_name, action_name)` |
+| 从零构建知识网络 | `ds connect` → `kn create` → `kn export` → `query search` |
+| 探索已有知识网络 | `kn list` → `kn export <kn-id>` → `query instances` |
+| 与 Agent 对话 | `agent list` → `agent chat` → `agent sessions` → `agent history` |
+| 执行 Action | `action execute --action-name 库存盘点` |
 
-## CLI 命令行
+## Python SDK
 
-安装 `pip install -e ".[cli]"` 后可使用 `kweaver` 命令：
+CLI 之外，也可以直接使用 Python SDK 进行程序化操作：
 
-```bash
-# 认证
-kweaver auth login https://your-adp-instance.com   # 浏览器登录（与 kweaverc 共享凭据）
-kweaver auth login https://xxx.com --alias prod    # 登录并设置别名
-kweaver auth logout                                 # 登出当前平台
-kweaver auth status                                 # 查看当前认证状态
-kweaver auth list                                   # 已保存的平台
-kweaver auth use prod                               # 切换平台（别名或 URL）
+```python
+from kweaver import ADPClient, ConfigAuth
 
-# 知识网络
-kweaver kn list
-kweaver kn get <kn-id>
-kweaver kn export <kn-id>
-kweaver kn build <kn-id>
+client = ADPClient(auth=ConfigAuth(), business_domain="bd_public")
 
-# 查询
-kweaver query search <kn-id> "高库存的产品"
-kweaver query instances <kn-id> <ot-id> --condition '{"field":"status","op":"eq","value":"active"}'
-
-# Action
-kweaver action query <kn-id> <action-type-id>
-kweaver action execute <kn-id> <action-type-id> --params '{"warehouse":"华东"}'
-kweaver action logs <kn-id>
-
-# Agent
-kweaver agent list
-kweaver agent chat <agent-id> -m "华东仓库库存情况"
-
-# 通用 API 调用（类似 curl，自动注入认证）
-kweaver call /api/ontology-manager/v1/knowledge-networks
+# 资源层 API
+kns = client.knowledge_networks.list()
+result = client.query.semantic_search(kn_id, "高库存的产品")
 ```
 
-CLI 与 kweaverc (TypeScript CLI) 共享 `~/.kweaver/` 凭据存储，用任一工具登录后另一个直接可用。
+SDK 提供以下资源：`datasources`, `dataviews`, `knowledge_networks`, `object_types`, `relation_types`, `query`, `action_types`, `agents`, `conversations`。
 
 ## 在 AI 智能体中使用
 
@@ -315,54 +151,29 @@ npx skills add kweaver-ai/kweaver-sdk --skill kweaver-core
 安装后需确保运行环境有 Python >= 3.10 且已安装 SDK：
 
 ```bash
-pip install kweaver-sdk          # 或 pip install kweaver-sdk[cli]
+pip install kweaver-sdk[cli]
 ```
 
 ### 认证
 
-推荐先用 CLI 登录，Skill 通过 `ConfigAuth` 自动读取 `~/.kweaver/` 凭据：
+推荐先用 CLI 登录：
 
 ```bash
-kweaver auth login https://your-adp-instance.com    # 或 kweaverc auth <url>
-```
-
-也可以用环境变量方式：
-
-```bash
-export ADP_BASE_URL="https://your-adp-instance.com"
-export ADP_BUSINESS_DOMAIN="bd_public"
-export ADP_TOKEN="Bearer ory_at_xxxxx"    # 或 ADP_USERNAME + ADP_PASSWORD
+kweaver auth login https://your-adp-instance.com
 ```
 
 ### Claude Code（本地开发）
 
 在 kweaver-sdk 项目目录下工作时，Skill 自动加载（`.claude/skills/kweaver/SKILL.md`）。其他项目可通过上述 `npx skills add` 安装。
 
-### OpenClaw（网关 Bot 部署）
-
-OpenClaw 网关以 Mac app / 后台进程方式运行，**不会继承你的 shell 环境变量**。
-
-```bash
-# 1. 安装 SDK
-pip install kweaver-sdk
-
-# 2. 安装 Skill
-npx skills add kweaver-ai/kweaver-sdk --skill kweaver-core
-
-# 3. 认证（终端登录，网关进程共享凭据）
-kweaver auth login https://your-adp-instance.com
-```
-
-> **注意**: 如果 SDK 装在 conda/venv 里，需要在平台配置中设置 `KWEAVER_PYTHON` 指向完整 Python 路径。
-
 ## 开发与测试
 
 ```bash
-# 单元测试 + 集成测试
+# 单元测试
 pytest
 
 # E2E 测试（需要 ADP 环境）
 pytest tests/e2e/ --run-destructive
 ```
 
-E2E 测试推荐先用 `kweaver auth login` 登录，测试会自动使用 `~/.kweaver/` 凭据。也支持 `ADP_USERNAME` + `ADP_PASSWORD` 环境变量方式。
+E2E 测试推荐先用 `kweaver auth login` 登录，测试会自动使用 `~/.kweaver/` 凭据。
