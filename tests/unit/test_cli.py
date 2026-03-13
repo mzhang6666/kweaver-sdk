@@ -529,3 +529,76 @@ def test_ds_connect_with_schema_and_name(runner):
         assert result.exit_code == 0
         data = _extract_json(result.output)
         assert data["datasource_id"] == "ds2"
+
+
+# ---------------------------------------------------------------------------
+# KN create subcommand
+# ---------------------------------------------------------------------------
+
+
+def test_kn_create(runner):
+    with patch("kweaver.cli.kn.make_client") as mock_make:
+        client = _mock_client()
+        mock_col_id = MagicMock(); mock_col_id.name = "id"; mock_col_id.type = "integer"
+        mock_col_name = MagicMock(); mock_col_name.name = "name"; mock_col_name.type = "varchar"
+        mock_table = MagicMock(); mock_table.name = "users"; mock_table.columns = [mock_col_id, mock_col_name]
+        client.datasources.list_tables.return_value = [mock_table]
+        mock_dv = MagicMock(); mock_dv.id = "dv1"
+        client.dataviews.create.return_value = mock_dv
+        mock_kn = MagicMock(); mock_kn.id = "kn1"; mock_kn.name = "test_kn"
+        client.knowledge_networks.create.return_value = mock_kn
+        mock_ot = MagicMock(); mock_ot.id = "ot1"; mock_ot.name = "users"
+        client.object_types.create.return_value = mock_ot
+        mock_job = MagicMock(); mock_status = MagicMock(); mock_status.state = "completed"
+        mock_job.wait.return_value = mock_status
+        client.knowledge_networks.build.return_value = mock_job
+        mock_make.return_value = client
+        result = runner.invoke(cli, ["kn", "create", "ds1", "--name", "test_kn"])
+        assert result.exit_code == 0
+        data = _extract_json(result.output)
+        assert data["kn_id"] == "kn1"
+        assert data["status"] == "completed"
+        assert len(data["object_types"]) == 1
+        ot_call = client.object_types.create.call_args
+        assert ot_call.kwargs["primary_keys"] == ["id"]
+        assert ot_call.kwargs["display_key"] == "name"
+
+
+def test_kn_create_no_build(runner):
+    with patch("kweaver.cli.kn.make_client") as mock_make:
+        client = _mock_client()
+        mock_col = MagicMock(); mock_col.name = "key"; mock_col.type = "varchar"
+        mock_table = MagicMock(); mock_table.name = "items"; mock_table.columns = [mock_col]
+        client.datasources.list_tables.return_value = [mock_table]
+        mock_dv = MagicMock(); mock_dv.id = "dv1"; client.dataviews.create.return_value = mock_dv
+        mock_kn = MagicMock(); mock_kn.id = "kn2"; mock_kn.name = "no_build_kn"
+        client.knowledge_networks.create.return_value = mock_kn
+        mock_ot = MagicMock(); mock_ot.id = "ot1"; mock_ot.name = "items"
+        client.object_types.create.return_value = mock_ot
+        mock_make.return_value = client
+        result = runner.invoke(cli, ["kn", "create", "ds1", "--name", "no_build_kn", "--no-build"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["status"] == "skipped"
+        client.knowledge_networks.build.assert_not_called()
+
+
+def test_kn_create_with_tables_filter(runner):
+    with patch("kweaver.cli.kn.make_client") as mock_make:
+        client = _mock_client()
+        mock_col = MagicMock(); mock_col.name = "id"; mock_col.type = "integer"
+        mock_t1 = MagicMock(); mock_t1.name = "users"; mock_t1.columns = [mock_col]
+        mock_t2 = MagicMock(); mock_t2.name = "orders"; mock_t2.columns = [mock_col]
+        client.datasources.list_tables.return_value = [mock_t1, mock_t2]
+        mock_dv = MagicMock(); mock_dv.id = "dv1"; client.dataviews.create.return_value = mock_dv
+        mock_kn = MagicMock(); mock_kn.id = "kn3"; mock_kn.name = "filtered"
+        client.knowledge_networks.create.return_value = mock_kn
+        mock_ot = MagicMock(); mock_ot.id = "ot1"; mock_ot.name = "users"
+        client.object_types.create.return_value = mock_ot
+        mock_job = MagicMock(); mock_status = MagicMock(); mock_status.state = "completed"
+        mock_job.wait.return_value = mock_status
+        client.knowledge_networks.build.return_value = mock_job
+        mock_make.return_value = client
+        result = runner.invoke(cli, ["kn", "create", "ds1", "--name", "filtered", "--tables", "users"])
+        assert result.exit_code == 0
+        assert client.object_types.create.call_count == 1

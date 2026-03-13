@@ -2,9 +2,33 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import click
 
-from kweaver.cli._helpers import error_exit, make_client, pp
+from kweaver.cli._helpers import error_exit, handle_errors, make_client, pp
+
+# PK/display key heuristics (moved from BuildKnSkill)
+_PK_CANDIDATES = {"id", "pk", "key"}
+_PK_TYPES = {"integer", "unsigned integer", "string", "varchar", "bigint", "int"}
+_DISPLAY_HINTS = {"name", "title", "label", "display_name", "description"}
+
+
+def _detect_primary_key(table: Any) -> str:
+    for col in table.columns:
+        if col.name.lower() in _PK_CANDIDATES and col.type.lower() in _PK_TYPES:
+            return col.name
+    for col in table.columns:
+        if col.type.lower() in _PK_TYPES:
+            return col.name
+    return table.columns[0].name if table.columns else "id"
+
+
+def _detect_display_key(table: Any, primary_key: str) -> str:
+    for col in table.columns:
+        if any(hint in col.name.lower() for hint in _DISPLAY_HINTS):
+            return col.name
+    return primary_key
 
 
 @click.group("kn")
@@ -66,3 +90,58 @@ def delete_kn(kn_id: str) -> None:
     client = make_client()
     client.knowledge_networks.delete(kn_id)
     click.echo(f"Deleted {kn_id}")
+
+
+@kn_group.command("create")
+@click.argument("datasource_id")
+@click.option("--name", required=True, help="Knowledge network name.")
+@click.option("--tables", default=None, help="Comma-separated table names (default: all).")
+@click.option("--build/--no-build", default=True, help="Build after creation.")
+@click.option("--timeout", default=300, type=int, help="Build timeout in seconds.")
+@handle_errors
+def create_kn(
+    datasource_id: str, name: str, tables: str | None, build: bool, timeout: int,
+) -> None:
+    """Create a knowledge network from a datasource."""
+    client = make_client()
+    all_tables = client.datasources.list_tables(datasource_id)
+    table_map = {t.name: t for t in all_tables}
+    if tables:
+        target_names = [n.strip() for n in tables.split(",")]
+        target_tables = [table_map[n] for n in target_names if n in table_map]
+    else:
+        target_tables = all_tables
+    if not target_tables:
+        error_exit("没有可用的表")
+    view_map: dict[str, str] = {}
+    for t in target_tables:
+        dv = client.dataviews.create(
+            name=t.name, datasource_id=datasource_id, table=t.name,
+            columns=t.columns,
+        )
+        view_map[t.name] = dv.id
+    kn = client.knowledge_networks.create(name=name)
+    ot_results: list[dict[str, Any]] = []
+    for t in target_tables:
+        pk = _detect_primary_key(t)
+        dk = _detect_display_key(t, pk)
+        ot = client.object_types.create(
+            kn.id,
+            name=t.name,
+            dataview_id=view_map[t.name],
+            primary_keys=[pk],
+            display_key=dk,
+        )
+        ot_results.append({
+            "name": ot.name, "id": ot.id, "field_count": len(t.columns),
+        })
+    status_str = "skipped"
+    if build:
+        click.echo("Building ...", err=True)
+        job = client.knowledge_networks.build(kn.id)
+        status = job.wait(timeout=timeout)
+        status_str = status.state
+    pp({
+        "kn_id": kn.id, "kn_name": kn.name,
+        "object_types": ot_results, "status": status_str,
+    })
