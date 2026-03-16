@@ -219,3 +219,106 @@ export async function deleteKnowledgeNetwork(
     throw new HttpError(response.status, response.statusText, body);
   }
 }
+
+/** List object types, relation types, or action types (ontology-manager). */
+export interface ListSchemaTypesOptions {
+  baseUrl: string;
+  accessToken: string;
+  knId: string;
+  businessDomain?: string;
+  branch?: string;
+  limit?: number;
+}
+
+export async function listObjectTypes(
+  options: ListSchemaTypesOptions
+): Promise<string> {
+  const {
+    baseUrl,
+    accessToken,
+    knId,
+    businessDomain = "bd_public",
+    branch = "main",
+    limit = -1,
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = new URL(
+    `${base}/api/ontology-manager/v1/knowledge-networks/${encodeURIComponent(knId)}/object-types`
+  );
+  url.searchParams.set("branch", branch);
+  url.searchParams.set("limit", String(limit));
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new HttpError(response.status, response.statusText, body);
+  }
+  return body;
+}
+
+export async function listRelationTypes(
+  options: ListSchemaTypesOptions
+): Promise<string> {
+  const {
+    baseUrl,
+    accessToken,
+    knId,
+    businessDomain = "bd_public",
+    branch = "main",
+    limit = -1,
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = new URL(
+    `${base}/api/ontology-manager/v1/knowledge-networks/${encodeURIComponent(knId)}/relation-types`
+  );
+  url.searchParams.set("branch", branch);
+  url.searchParams.set("limit", String(limit));
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new HttpError(response.status, response.statusText, body);
+  }
+  return body;
+}
+
+export async function listActionTypes(
+  options: ListSchemaTypesOptions
+): Promise<string> {
+  const {
+    baseUrl,
+    accessToken,
+    knId,
+    businessDomain = "bd_public",
+    branch = "main",
+    limit = -1,
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = new URL(
+    `${base}/api/ontology-manager/v1/knowledge-networks/${encodeURIComponent(knId)}/action-types`
+  );
+  url.searchParams.set("branch", branch);
+  url.searchParams.set("limit", String(limit));
+
+  const response = await fetch(url.toString(), {
+    method: "GET",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) {
+    throw new HttpError(response.status, response.statusText, body);
+  }
+  return body;
+}

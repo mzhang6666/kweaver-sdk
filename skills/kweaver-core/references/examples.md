@@ -158,6 +158,7 @@ kweaver action log <kn-id> <log-id>
 ```bash
 kweaver agent list
 kweaver agent list --keyword "供应链"
+kweaver agent list --offset 0 --limit 20
 ```
 
 首轮对话：

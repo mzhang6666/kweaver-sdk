@@ -259,6 +259,7 @@ class Message(BaseModel):
     content: str
     references: list[Reference] = []
     timestamp: str
+    conversation_id: str = ""
 
 
 class MessageChunk(BaseModel):

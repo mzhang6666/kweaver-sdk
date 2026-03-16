@@ -83,6 +83,65 @@ kweaver-sdk/
 └── README.md
 ```
 
+## CLI 手动测试
+
+以下命令用于验证 CLI 功能，需先完成 `kweaver auth login`。业务域默认 `bd_public`，可通过 `KWEAVER_BUSINESS_DOMAIN` 或 `-bd` 覆盖。
+
+```bash
+# 可选：覆盖业务域（默认 bd_public）
+# export KWEAVER_BUSINESS_DOMAIN=bd_public
+
+# 1. 认证状态
+kweaver auth status
+
+# 2. Agent 列表（默认简化输出 name/id/description）
+kweaver agent list
+kweaver agent list -v              # 完整输出
+
+# 3. 给 Agent 发消息（替换 <agent_id> 为 agent list 返回的 id）
+kweaver agent chat <agent_id> -m "你好"
+# 续聊：使用上一条返回的 --conversation-id
+kweaver agent chat <agent_id> -m "今天天气怎么样" --conversation-id <conversation_id>
+
+# 4. BKN 列表（默认 limit=50，简化输出）
+kweaver bkn list
+kweaver bkn list -v                # 完整输出
+kweaver bkn list --limit 10        # 限制条数
+
+# 5. Context-loader（需先配置 kn-id）
+kweaver context-loader config set --kn-id <kn_id> --name my-bkn
+kweaver context-loader config use my-bkn
+kweaver context-loader kn-search "关键词"
+kweaver context-loader tools       # 列出可用工具
+
+# 6. 原始 API 调用
+kweaver call "/api/agent-factory/v3/personal-space/agent-list?offset=0&limit=3" --pretty
+```
+
+**TypeScript CLI**（需 Node.js 24+，`nvm use 24`）：
+
+```bash
+cd packages/typescript
+npx tsx src/cli.ts auth status
+npx tsx src/cli.ts agent list
+npx tsx src/cli.ts agent chat <agent_id> -m "你好"
+npx tsx src/cli.ts bkn list
+npx tsx src/cli.ts context-loader config set --kn-id <kn_id>
+npx tsx src/cli.ts context-loader kn-search "关键词"
+```
+
+**Python CLI**：
+
+```bash
+cd packages/python
+.venv/bin/kweaver auth status
+.venv/bin/kweaver agent list
+.venv/bin/kweaver agent chat <agent_id> -m "你好"
+.venv/bin/kweaver bkn list
+.venv/bin/kweaver context-loader config set --kn-id <kn_id>
+.venv/bin/kweaver context-loader kn-search "关键词"
+```
+
 ## 开发与测试
 
 ```bash

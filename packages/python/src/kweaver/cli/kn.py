@@ -40,37 +40,42 @@ def kn_group() -> None:
 @kn_group.command("list")
 @click.option("--name", default=None, help="Filter by name.")
 @click.option("--name-pattern", default=None, help="Filter by name pattern (substring).")
-@click.option("--tag", default=None, multiple=True, help="Filter by tag (repeatable).")
-@click.option("--sort", default=None, help="Sort field.")
-@click.option("--direction", default=None, type=click.Choice(["asc", "desc"]), help="Sort direction.")
-@click.option("--offset", default=None, type=int, help="Pagination offset.")
-@click.option("--limit", default=None, type=int, help="Max items to return.")
+@click.option("--tag", default=None, help="Filter by tag.")
+@click.option("--sort", default="update_time", help="Sort field (default: update_time).")
+@click.option("--direction", default="desc", type=click.Choice(["asc", "desc"]), help="Sort direction (default: desc).")
+@click.option("--offset", default=0, type=int, help="Pagination offset (default: 0).")
+@click.option("--limit", default=50, type=int, help="Max items to return (default: 50).")
+@click.option("--verbose", "-v", is_flag=True, help="Show full JSON response.")
 @handle_errors
 def list_kns(
     name: str | None,
     name_pattern: str | None,
-    tag: tuple[str, ...],
-    sort: str | None,
-    direction: str | None,
-    offset: int | None,
-    limit: int | None,
+    tag: str | None,
+    sort: str,
+    direction: str,
+    offset: int,
+    limit: int,
+    verbose: bool,
 ) -> None:
     """List knowledge networks."""
     client = make_client()
-    kns = client.knowledge_networks.list(name=name)
-    result = [kn.model_dump() for kn in kns]
-    if name_pattern:
-        result = [r for r in result if name_pattern.lower() in (r.get("name") or "").lower()]
-    if tag:
-        tag_set = set(tag)
-        result = [r for r in result if tag_set.intersection(r.get("tags", []))]
-    if sort:
-        result = sorted(result, key=lambda r: r.get(sort, ""), reverse=(direction == "desc"))
-    if offset is not None:
-        result = result[offset:]
-    if limit is not None:
-        result = result[:limit]
-    pp(result)
+    kns = client.knowledge_networks.list(
+        name=name,
+        name_pattern=name_pattern,
+        tag=tag,
+        offset=offset,
+        limit=limit,
+        sort=sort,
+        direction=direction,
+    )
+    if verbose:
+        pp([kn.model_dump() for kn in kns])
+    else:
+        simplified = [
+            {"name": kn.name, "id": kn.id, "description": kn.comment or ""}
+            for kn in kns
+        ]
+        pp(simplified)
 
 
 @kn_group.command("stats")
@@ -79,7 +84,7 @@ def list_kns(
 def stats_kn(kn_id: str) -> None:
     """Show statistics for a knowledge network."""
     client = make_client()
-    kn = client.knowledge_networks.get(kn_id)
+    kn = client.knowledge_networks.get(kn_id, include_statistics=True)
     if kn.statistics:
         pp(kn.statistics.model_dump())
     else:
@@ -110,12 +115,21 @@ def update_kn(kn_id: str, name: str | None, description: str | None, tag: tuple[
 
 @kn_group.command("get")
 @click.argument("kn_id")
+@click.option("--stats", is_flag=True, help="Include statistics.")
+@click.option("--export", "export_mode", is_flag=True, help="Export mode (full schema).")
 @handle_errors
-def get_kn(kn_id: str) -> None:
+def get_kn(kn_id: str, stats: bool, export_mode: bool) -> None:
     """Get knowledge network details."""
     client = make_client()
-    kn = client.knowledge_networks.get(kn_id)
-    pp(kn.model_dump())
+    if export_mode:
+        data = client.knowledge_networks.export(kn_id)
+        pp(data)
+    else:
+        kn = client.knowledge_networks.get(kn_id, include_statistics=stats)
+        if stats and kn.statistics:
+            pp(kn.statistics.model_dump())
+        else:
+            pp(kn.model_dump())
 
 
 @kn_group.command("export")
@@ -212,6 +226,53 @@ def create_kn(
         "kn_id": kn.id, "kn_name": kn.name,
         "object_types": ot_results, "status": status_str,
     })
+
+
+# ── object-type, relation-type, action-type (schema list) ──────────────────────
+
+@kn_group.group("object-type")
+def object_type_group() -> None:
+    """Object type (schema) commands."""
+
+
+@object_type_group.command("list")
+@click.argument("kn_id")
+@handle_errors
+def object_type_list(kn_id: str) -> None:
+    """List object types for a knowledge network."""
+    client = make_client()
+    ots = client.object_types.list(kn_id)
+    pp([ot.model_dump() for ot in ots])
+
+
+@kn_group.group("relation-type")
+def relation_type_group() -> None:
+    """Relation type (schema) commands."""
+
+
+@relation_type_group.command("list")
+@click.argument("kn_id")
+@handle_errors
+def relation_type_list(kn_id: str) -> None:
+    """List relation types for a knowledge network."""
+    client = make_client()
+    rts = client.relation_types.list(kn_id)
+    pp([rt.model_dump() for rt in rts])
+
+
+@kn_group.group("action-type")
+def action_type_group() -> None:
+    """Action type (schema) commands."""
+
+
+@action_type_group.command("list")
+@click.argument("kn_id")
+@handle_errors
+def action_type_list(kn_id: str) -> None:
+    """List action types for a knowledge network."""
+    client = make_client()
+    ats = client.action_types.list(kn_id)
+    pp(ats)
 
 
 # ── action-log subgroup ───────────────────────────────────────────────────────

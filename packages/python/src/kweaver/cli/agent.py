@@ -14,24 +14,33 @@ def agent_group() -> None:
 
 @agent_group.command("list")
 @click.option("--keyword", default=None, help="Filter by keyword.")
-@click.option("--size", default=48, type=int, help="Page size (default: 48).")
-@click.option("--pagination-marker", default=None, help="Pagination marker for next page.")
+@click.option("--offset", default=0, type=int, help="Pagination offset (default: 0).")
+@click.option("--limit", default=50, type=int, help="Max items to return (default: 50).")
 @click.option("--category-id", default=None, help="Filter by category ID.")
 @click.option("--status", default=None, help="Filter by status (e.g. published, draft).")
+@click.option("--verbose", "-v", is_flag=True, help="Show full JSON response.")
 @handle_errors
 def list_agents(
     keyword: str | None,
-    size: int,
-    pagination_marker: str | None,
+    offset: int,
+    limit: int,
     category_id: str | None,
     status: str | None,
+    verbose: bool,
 ) -> None:
     """List published agents."""
     client = make_client()
-    agents = client.agents.list(keyword=keyword, status=status, size=size)
+    agents = client.agents.list(keyword=keyword, status=status, offset=offset, limit=limit)
     if category_id:
         agents = [a for a in agents if category_id in getattr(a, "category_ids", [])]
-    pp([a.model_dump() for a in agents])
+    if verbose:
+        pp([a.model_dump() for a in agents])
+    else:
+        simplified = [
+            {"name": a.name, "id": a.id, "description": a.description or ""}
+            for a in agents
+        ]
+        pp(simplified)
 
 
 @agent_group.command("chat")
@@ -43,22 +52,29 @@ def chat(agent_id: str, message: str, conversation_id: str | None) -> None:
     """Chat with a Decision Agent."""
     client = make_client()
 
-    if not conversation_id:
-        conv = client.conversations.create(agent_id)
-        conversation_id = conv.id
-        click.echo(f"Conversation: {conversation_id}")
-
     msg = client.conversations.send_message(
         agent_id=agent_id,
-        conversation_id=conversation_id,
+        conversation_id=conversation_id or "",
         content=message,
     )
+
     click.echo(f"\n{msg.content}")
 
     if msg.references:
         click.echo("\nReferences:")
         for ref in msg.references:
             click.echo(f"  - [{ref.score:.2f}] {ref.source}: {ref.content[:100]}")
+
+    if msg.conversation_id:
+        click.echo("", err=True)
+        click.echo(
+            "To continue this conversation, rerun the command with --conversation-id:",
+            err=True,
+        )
+        click.echo(
+            f'kweaver agent chat {agent_id} -m "{{你的下一轮问题}}" --conversation-id {msg.conversation_id}',
+            err=True,
+        )
 
 
 @agent_group.command("sessions")

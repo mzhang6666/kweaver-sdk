@@ -24,7 +24,8 @@ class AgentsResource:
         *,
         keyword: str | None = None,
         status: str | None = None,
-        size: int = 48,
+        offset: int = 0,
+        limit: int = 50,
     ) -> list[Agent]:
         """List agents.
 
@@ -32,9 +33,10 @@ class AgentsResource:
             keyword: Filter by name substring.
             status: Filter by status. "published" matches both
                     "published" and "published_edited" on the backend.
-            size: Page size (default 48).
+            offset: Pagination offset (default 0).
+            limit: Max items to return (default 50).
         """
-        params: dict[str, Any] = {"size": size}
+        params: dict[str, Any] = {"offset": offset, "limit": limit}
         if keyword:
             params["name"] = keyword
         if status:

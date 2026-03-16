@@ -6,8 +6,8 @@ import { formatCallOutput } from "./call.js";
 
 export interface AgentListOptions {
   name: string;
-  size: number;
-  pagination_marker_str: string;
+  offset: number;
+  limit: number;
   category_id: string;
   custom_space_id: string;
   is_to_square: number;
@@ -78,8 +78,8 @@ export function formatSimpleAgentList(text: string, pretty: boolean): string {
 
 export function parseAgentListArgs(args: string[]): AgentListOptions {
   let name = "";
-  let size = 48;
-  let pagination_marker_str = "";
+  let offset = 0;
+  let limit = 50;
   let category_id = "";
   let custom_space_id = "";
   let is_to_square = 1;
@@ -100,15 +100,16 @@ export function parseAgentListArgs(args: string[]): AgentListOptions {
       continue;
     }
 
-    if (arg === "--size") {
-      size = parseInt(args[i + 1] ?? "48", 10);
-      if (Number.isNaN(size) || size < 1) size = 48;
+    if (arg === "--offset") {
+      offset = parseInt(args[i + 1] ?? "0", 10);
+      if (Number.isNaN(offset) || offset < 0) offset = 0;
       i += 1;
       continue;
     }
 
-    if (arg === "--pagination-marker") {
-      pagination_marker_str = args[i + 1] ?? "";
+    if (arg === "--limit") {
+      limit = parseInt(args[i + 1] ?? "50", 10);
+      if (Number.isNaN(limit) || limit < 1) limit = 50;
       i += 1;
       continue;
     }
@@ -160,8 +161,8 @@ export function parseAgentListArgs(args: string[]): AgentListOptions {
 
   return {
     name,
-    size,
-    pagination_marker_str,
+    offset,
+    limit,
     category_id,
     custom_space_id,
     is_to_square,
@@ -344,9 +345,9 @@ List published agents from the agent-factory API.
 
 Options:
   --name <text>             Filter by name
-  --size <n>                Page size (default: 48)
-  --pagination-marker <str>  Pagination marker for next page
-  --category-id <id>         Filter by category
+  --offset <n>              Pagination offset (default: 0)
+  --limit <n>               Max items to return (default: 50)
+  --category-id <id>        Filter by category
   --custom-space-id <id>    Filter by custom space
   --is-to-square <0|1>      Is to square (default: 1)
   --verbose, -v             Show full JSON response
@@ -403,9 +404,9 @@ List published agents from the agent-factory API.
 
 Options:
   --name <text>             Filter by name
-  --size <n>                Page size (default: 48)
-  --pagination-marker <str>  Pagination marker for next page
-  --category-id <id>         Filter by category
+  --offset <n>              Pagination offset (default: 0)
+  --limit <n>               Max items to return (default: 50)
+  --category-id <id>        Filter by category
   --custom-space-id <id>    Filter by custom space
   --is-to-square <0|1>      Is to square (default: 1)
   --verbose, -v             Show full JSON response
@@ -424,8 +425,8 @@ Options:
       accessToken: token.accessToken,
       businessDomain: options.businessDomain,
       name: options.name,
-      size: options.size,
-      pagination_marker_str: options.pagination_marker_str,
+      offset: options.offset,
+      limit: options.limit,
       category_id: options.category_id,
       custom_space_id: options.custom_space_id,
       is_to_square: options.is_to_square,

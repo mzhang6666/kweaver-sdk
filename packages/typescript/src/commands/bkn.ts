@@ -7,6 +7,9 @@ import {
   createKnowledgeNetwork,
   updateKnowledgeNetwork,
   deleteKnowledgeNetwork,
+  listObjectTypes,
+  listRelationTypes,
+  listActionTypes,
 } from "../api/knowledge-networks.js";
 import {
   objectTypeQuery,
@@ -583,9 +586,12 @@ Subcommands:
   delete <kn-id>       Delete a knowledge network
   export <kn-id>       Export knowledge network (alias for get --export)
   stats <kn-id>        Get statistics (alias for get --stats)
+  object-type list <kn-id>   List object types (schema)
   object-type query <kn-id> <ot-id> ['<json>']   Query object instances (ontology-query; supports --limit/--search-after)
   object-type properties <kn-id> <ot-id> '<json>'   Query object properties
+  relation-type list <kn-id>   List relation types (schema)
   subgraph <kn-id> '<json>'   Query subgraph
+  action-type list <kn-id>   List action types (schema)
   action-type query <kn-id> <at-id> '<json>'   Query action info
   action-type execute <kn-id> <at-id> '<json>'   Execute action (has side effects)
   action-execution get <kn-id> <execution-id>   Get execution status
@@ -633,6 +639,10 @@ export async function runKnCommand(args: string[]): Promise<number> {
 
   if (subcommand === "object-type") {
     return runKnObjectTypeCommand(rest);
+  }
+
+  if (subcommand === "relation-type") {
+    return runKnRelationTypeCommand(rest);
   }
 
   if (subcommand === "subgraph") {
@@ -751,14 +761,34 @@ export function parseKnActionTypeExecuteArgs(args: string[]): KnActionTypeExecut
 async function runKnObjectTypeCommand(args: string[]): Promise<number> {
   const [action, ...rest] = args;
   if (!action || action === "--help" || action === "-h") {
-    console.log(`kweaver bkn object-type query <kn-id> <ot-id> ['<json>'] [--limit <n>] [--search-after '<json-array>'] [--pretty] [-bd value]
+    console.log(`kweaver bkn object-type list <kn-id> [--pretty] [-bd value]
+kweaver bkn object-type query <kn-id> <ot-id> ['<json>'] [--limit <n>] [--search-after '<json-array>'] [--pretty] [-bd value]
 kweaver bkn object-type properties <kn-id> <ot-id> '<json>' [--pretty] [-bd value]
 
-Query object types via ontology-query API. For query, --limit and --search-after are merged into the JSON body.`);
+list: List object types (schema) from ontology-manager.
+query/properties: Query via ontology-query API. For query, --limit and --search-after are merged into the JSON body.`);
     return 0;
   }
 
   try {
+    if (action === "list") {
+      const parsed = parseOntologyQueryFlags(rest);
+      const [knId] = parsed.filteredArgs;
+      if (!knId) {
+        console.error("Usage: kweaver bkn object-type list <kn-id> [options]");
+        return 1;
+      }
+      const token = await ensureValidToken();
+      const body = await listObjectTypes({
+        baseUrl: token.baseUrl,
+        accessToken: token.accessToken,
+        knId,
+        businessDomain: parsed.businessDomain,
+      });
+      console.log(formatCallOutput(body, parsed.pretty));
+      return 0;
+    }
+
     if (action === "query") {
       const options = parseKnObjectTypeQueryArgs(rest);
       const token = await ensureValidToken();
@@ -795,8 +825,44 @@ Query object types via ontology-query API. For query, --limit and --search-after
       return 0;
     }
 
-    console.error(`Unknown object-type action: ${action}. Use query or properties.`);
+    console.error(`Unknown object-type action: ${action}. Use list, query, or properties.`);
     return 1;
+  } catch (error) {
+    console.error(formatHttpError(error));
+    return 1;
+  }
+}
+
+async function runKnRelationTypeCommand(args: string[]): Promise<number> {
+  const [action, ...rest] = args;
+  if (!action || action === "--help" || action === "-h") {
+    console.log(`kweaver bkn relation-type list <kn-id> [--pretty] [-bd value]
+
+List relation types (schema) from ontology-manager.`);
+    return 0;
+  }
+
+  if (action !== "list") {
+    console.error(`Unknown relation-type action: ${action}. Use list.`);
+    return 1;
+  }
+
+  try {
+    const parsed = parseOntologyQueryFlags(rest);
+    const [knId] = parsed.filteredArgs;
+    if (!knId) {
+      console.error("Usage: kweaver bkn relation-type list <kn-id> [options]");
+      return 1;
+    }
+    const token = await ensureValidToken();
+    const body = await listRelationTypes({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      knId,
+      businessDomain: parsed.businessDomain,
+    });
+    console.log(formatCallOutput(body, parsed.pretty));
+    return 0;
   } catch (error) {
     console.error(formatHttpError(error));
     return 1;
@@ -870,14 +936,39 @@ function extractStatus(body: string): string {
 async function runKnActionTypeCommand(args: string[]): Promise<number> {
   const [action, ...rest] = args;
   if (!action || action === "--help" || action === "-h") {
-    console.log(`kweaver bkn action-type query <kn-id> <at-id> '<json>' [--pretty] [-bd value]
+    console.log(`kweaver bkn action-type list <kn-id> [--pretty] [-bd value]
+kweaver bkn action-type query <kn-id> <at-id> '<json>' [--pretty] [-bd value]
 kweaver bkn action-type execute <kn-id> <at-id> '<json>' [--pretty] [-bd value] [--wait|--no-wait] [--timeout n]
 
-Query or execute actions. execute has side effects - only use when explicitly requested.
+list: List action types (schema) from ontology-manager.
+query/execute: Query or execute actions. execute has side effects - only use when explicitly requested.
   --wait (default)    Poll until execution completes
   --no-wait           Return immediately after starting execution
   --timeout <seconds> Max wait time when --wait (default: 300)`);
     return 0;
+  }
+
+  if (action === "list") {
+    try {
+      const parsed = parseOntologyQueryFlags(rest);
+      const [knId] = parsed.filteredArgs;
+      if (!knId) {
+        console.error("Usage: kweaver bkn action-type list <kn-id> [options]");
+        return 1;
+      }
+      const token = await ensureValidToken();
+      const body = await listActionTypes({
+        baseUrl: token.baseUrl,
+        accessToken: token.accessToken,
+        knId,
+        businessDomain: parsed.businessDomain,
+      });
+      console.log(formatCallOutput(body, parsed.pretty));
+      return 0;
+    } catch (error) {
+      console.error(formatHttpError(error));
+      return 1;
+    }
   }
 
   if (action === "query") {
@@ -971,7 +1062,7 @@ Query or execute actions. execute has side effects - only use when explicitly re
     }
   }
 
-  console.error(`Unknown action-type action: ${action}. Use query or execute.`);
+  console.error(`Unknown action-type action: ${action}. Use list, query, or execute.`);
   return 1;
 }
 

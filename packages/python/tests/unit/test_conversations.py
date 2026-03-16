@@ -96,3 +96,53 @@ def test_delete_calls_terminate(capture: RequestCapture):
     client = make_client(handler, capture)
     client.conversations.delete("conv_01", agent_id="agent_01")
     assert "/chat/termination" in capture.last_url()
+
+
+def test_list_conversations(capture: RequestCapture):
+    """List conversations calls GET /app/{agent_id}/conversations."""
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "entries": [
+                {"id": "conv_01", "agent_id": "agent_01", "title": "Session 1", "message_count": 3},
+            ],
+        })
+
+    client = make_client(handler, capture)
+    convs = client.conversations.list(agent_id="agent_01")
+    assert len(convs) == 1
+    assert convs[0].id == "conv_01"
+    assert convs[0].agent_id == "agent_01"
+    assert "/app/agent_01/conversations" in capture.last_url()
+
+
+def test_list_conversations_404_returns_empty():
+    """404 (endpoint not available) returns empty list."""
+    client = make_client(lambda r: httpx.Response(404, json={"message": "not found"}))
+    convs = client.conversations.list(agent_id="agent_01")
+    assert convs == []
+
+
+def test_list_messages(capture: RequestCapture):
+    """List messages calls GET /conversations/{id}/messages."""
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "messages": [
+                {"id": "msg_01", "role": "user", "content": "hello", "timestamp": "2026-03-12T10:00:00Z"},
+                {"id": "msg_02", "role": "assistant", "content": "hi", "timestamp": "2026-03-12T10:00:01Z"},
+            ],
+        })
+
+    client = make_client(handler, capture)
+    msgs = client.conversations.list_messages("conv_01", limit=20)
+    assert len(msgs) == 2
+    assert msgs[0].role == "user" and msgs[0].content == "hello"
+    assert msgs[1].role == "assistant" and msgs[1].content == "hi"
+    assert "/conversations/conv_01/messages" in capture.last_url()
+    assert "limit=20" in capture.last_url()
+
+
+def test_list_messages_404_returns_empty():
+    """404 (endpoint not available) returns empty list."""
+    client = make_client(lambda r: httpx.Response(404, json={"message": "not found"}))
+    msgs = client.conversations.list_messages("conv_01")
+    assert msgs == []

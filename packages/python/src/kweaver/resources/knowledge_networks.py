@@ -44,18 +44,54 @@ class KnowledgeNetworksResource:
                         return kn
             raise
 
-    def list(self, *, name: str | None = None) -> list[KnowledgeNetwork]:
-        params: dict[str, Any] = {}
+    def list(
+        self,
+        *,
+        name: str | None = None,
+        name_pattern: str | None = None,
+        tag: str | None = None,
+        offset: int = 0,
+        limit: int = 50,
+        sort: str = "update_time",
+        direction: str = "desc",
+    ) -> list[KnowledgeNetwork]:
+        params: dict[str, Any] = {
+            "offset": offset,
+            "limit": limit,
+            "sort": sort,
+            "direction": direction,
+        }
         if name:
             params["name"] = name
+        if name_pattern:
+            params["name_pattern"] = name_pattern
+        if tag:
+            params["tag"] = tag
         data = self._http.get(
-            "/api/ontology-manager/v1/knowledge-networks", params=params or None
+            "/api/ontology-manager/v1/knowledge-networks", params=params
         )
         items = data if isinstance(data, list) else (data.get("entries") or data.get("data") or [])
         return [_parse_kn(d) for d in items]
 
-    def get(self, id: str) -> KnowledgeNetwork:
-        data = self._http.get(f"/api/ontology-manager/v1/knowledge-networks/{id}")
+    def get(
+        self,
+        id: str,
+        *,
+        include_statistics: bool = False,
+    ) -> KnowledgeNetwork:
+        """Get knowledge network by ID.
+
+        Args:
+            id: Knowledge network ID.
+            include_statistics: If True, request statistics in the response.
+        """
+        params: dict[str, Any] = {}
+        if include_statistics:
+            params["include_statistics"] = "true"
+        data = self._http.get(
+            f"/api/ontology-manager/v1/knowledge-networks/{id}",
+            params=params or None,
+        )
         return _parse_kn(data)
 
     def update(self, id: str, **kwargs: Any) -> KnowledgeNetwork:

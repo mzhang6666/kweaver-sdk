@@ -20,6 +20,26 @@ def test_create_knowledge_network(capture: RequestCapture):
     assert kn.id == "kn_01"
 
 
+def test_get_knowledge_network_with_statistics(capture: RequestCapture):
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "id": "kn_01", "name": "test_kn", "tags": [],
+            "statistics": {
+                "object_types_total": 5,
+                "relation_types_total": 2,
+                "action_types_total": 1,
+                "concept_groups_total": 0,
+            },
+        })
+
+    client = make_client(handler, capture)
+    kn = client.knowledge_networks.get("kn_01", include_statistics=True)
+    assert kn.id == "kn_01"
+    assert kn.statistics is not None
+    assert kn.statistics.object_types_total == 5
+    assert "include_statistics=true" in capture.last_url()
+
+
 def test_list_knowledge_networks():
     def handler(req: httpx.Request) -> httpx.Response:
         return httpx.Response(200, json={"data": [

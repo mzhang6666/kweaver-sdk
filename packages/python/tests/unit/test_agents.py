@@ -64,6 +64,17 @@ def test_list_agents_with_filters(capture: RequestCapture):
     assert "publish_status=published" in url
 
 
+def test_list_agents_with_offset_limit(capture: RequestCapture):
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={"entries": []})
+
+    client = make_client(handler, capture)
+    client.agents.list(offset=10, limit=20)
+    url = capture.last_url()
+    assert "offset=10" in url
+    assert "limit=20" in url
+
+
 def test_list_agents_raw_list():
     """API returning a plain list (instead of {entries: [...]})."""
     def handler(req: httpx.Request) -> httpx.Response:

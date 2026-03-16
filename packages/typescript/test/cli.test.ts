@@ -790,8 +790,8 @@ test("parseKnObjectTypeQueryArgs validates --search-after json array", () => {
 test("parseAgentListArgs parses flags with defaults", () => {
   const opts = parseAgentListArgs([]);
   assert.equal(opts.name, "");
-  assert.equal(opts.size, 48);
-  assert.equal(opts.pagination_marker_str, "");
+  assert.equal(opts.offset, 0);
+  assert.equal(opts.limit, 50);
   assert.equal(opts.category_id, "");
   assert.equal(opts.custom_space_id, "");
   assert.equal(opts.is_to_square, 1);
@@ -800,14 +800,14 @@ test("parseAgentListArgs parses flags with defaults", () => {
   assert.equal(opts.verbose, false);
 });
 
-test("parseAgentListArgs parses custom name size and body fields", () => {
+test("parseAgentListArgs parses custom name offset limit and body fields", () => {
   const opts = parseAgentListArgs([
     "--name",
     "my-agent",
-    "--size",
+    "--offset",
+    "10",
+    "--limit",
     "20",
-    "--pagination-marker",
-    "marker-xyz",
     "--category-id",
     "cat-1",
     "--custom-space-id",
@@ -820,8 +820,8 @@ test("parseAgentListArgs parses custom name size and body fields", () => {
     "bd_enterprise",
   ]);
   assert.equal(opts.name, "my-agent");
-  assert.equal(opts.size, 20);
-  assert.equal(opts.pagination_marker_str, "marker-xyz");
+  assert.equal(opts.offset, 10);
+  assert.equal(opts.limit, 20);
   assert.equal(opts.category_id, "cat-1");
   assert.equal(opts.custom_space_id, "space-1");
   assert.equal(opts.is_to_square, 0);
@@ -912,7 +912,7 @@ test("run bkn create --help shows create options", async () => {
   }
 });
 
-test("run bkn object-type --help shows query and properties usage", async () => {
+test("run bkn object-type --help shows list query and properties usage", async () => {
   const lines: string[] = [];
   const originalLog = console.log;
   console.log = (...args: unknown[]) => {
@@ -921,6 +921,7 @@ test("run bkn object-type --help shows query and properties usage", async () => 
   try {
     assert.equal(await run(["bkn", "object-type", "--help"]), 0);
     const help = lines.join("\n");
+    assert.ok(help.includes("object-type list"));
     assert.ok(help.includes("object-type query"));
     assert.ok(help.includes("object-type properties"));
     assert.ok(help.includes("<kn-id>"));
@@ -948,7 +949,7 @@ test("run bkn subgraph --help shows usage", async () => {
   }
 });
 
-test("run bkn action-type --help shows query and execute with side effects note", async () => {
+test("run bkn action-type --help shows list query and execute with side effects note", async () => {
   const lines: string[] = [];
   const originalLog = console.log;
   console.log = (...args: unknown[]) => {
@@ -957,6 +958,7 @@ test("run bkn action-type --help shows query and execute with side effects note"
   try {
     assert.equal(await run(["bkn", "action-type", "--help"]), 0);
     const help = lines.join("\n");
+    assert.ok(help.includes("action-type list"));
     assert.ok(help.includes("action-type query"));
     assert.ok(help.includes("action-type execute"));
     assert.ok(help.includes("side effects"));
@@ -1009,7 +1011,8 @@ test("run agent list --help shows list options", async () => {
     const help = lines.join("\n");
     assert.ok(help.includes("List published agents"));
     assert.ok(help.includes("--name"));
-    assert.ok(help.includes("--size"));
+    assert.ok(help.includes("--offset"));
+    assert.ok(help.includes("--limit"));
     assert.ok(help.includes("--verbose"));
     assert.ok(help.includes("--pretty"));
   } finally {

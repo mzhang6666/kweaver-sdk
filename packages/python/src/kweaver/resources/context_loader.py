@@ -76,7 +76,7 @@ class ContextLoaderResource:
             },
         })
 
-        with httpx.Client() as client:
+        with httpx.Client(follow_redirects=True) as client:
             resp = client.post(
                 self._mcp_url,
                 content=init_body,
@@ -100,7 +100,7 @@ class ContextLoaderResource:
             "jsonrpc": "2.0",
             "method": "notifications/initialized",
         })
-        with httpx.Client() as client:
+        with httpx.Client(follow_redirects=True) as client:
             client.post(
                 self._mcp_url,
                 content=notif_body,
@@ -121,7 +121,7 @@ class ContextLoaderResource:
         if params:
             body["params"] = params
 
-        with httpx.Client() as client:
+        with httpx.Client(follow_redirects=True) as client:
             resp = client.post(
                 self._mcp_url,
                 content=json.dumps(body),
@@ -149,7 +149,7 @@ class ContextLoaderResource:
             "id": _next_id(),
         }
 
-        with httpx.Client() as client:
+        with httpx.Client(follow_redirects=True) as client:
             resp = client.post(
                 self._mcp_url,
                 content=json.dumps(body),

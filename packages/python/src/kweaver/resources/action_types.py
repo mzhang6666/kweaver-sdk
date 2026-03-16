@@ -1,4 +1,4 @@
-"""SDK resource: action types (ontology-query)."""
+"""SDK resource: action types (ontology-query + ontology-manager)."""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ if TYPE_CHECKING:
     from kweaver._http import HttpClient
 
 _PREFIX = "/api/ontology-query/v1/knowledge-networks"
+_OM_PREFIX = "/api/ontology-manager/v1/knowledge-networks"
 
 
 class ActionTypesResource:
@@ -17,6 +18,16 @@ class ActionTypesResource:
 
     def __init__(self, http: HttpClient) -> None:
         self._http = http
+
+    def list(self, kn_id: str, *, branch: str = "main") -> list[dict[str, Any]]:
+        """List action types (schema) from ontology-manager."""
+        data = self._http.get(
+            f"{_OM_PREFIX}/{kn_id}/action-types",
+            params={"limit": -1, "branch": branch},
+        )
+        if isinstance(data, list):
+            return data
+        return data.get("entries") or data.get("data") or []
 
     def query(self, kn_id: str, action_type_id: str, body: dict[str, Any] | None = None) -> dict[str, Any]:
         """Query an Action Type definition and parameters."""

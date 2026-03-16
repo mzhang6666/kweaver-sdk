@@ -1,16 +1,19 @@
 """SDK resource: conversations (agent-app service).
 
 Actual backend endpoints (agent-app v1):
-  - Chat:      POST /api/agent-app/v1/app/{app_key}/chat/completion
-  - Debug:     POST /api/agent-app/v1/app/{app_key}/debug/completion
-  - Terminate: POST /api/agent-app/v1/app/{app_key}/chat/termination
-  - Resume:    POST /api/agent-app/v1/app/{app_key}/chat/resume
+  - Chat:         POST /api/agent-app/v1/app/{app_key}/chat/completion
+  - Debug:        POST /api/agent-app/v1/app/{app_key}/debug/completion
+  - Terminate:    POST /api/agent-app/v1/app/{app_key}/chat/termination
+  - Resume:       POST /api/agent-app/v1/app/{app_key}/chat/resume
+  - List convs:   GET  /api/agent-app/v1/app/{agent_id}/conversations
+  - List msgs:    GET  /api/agent-app/v1/conversations/{id}/messages
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, Iterator
 
+from kweaver._errors import NotFoundError
 from kweaver.types import Conversation, Message, MessageChunk, Reference
 
 if TYPE_CHECKING:
@@ -124,13 +127,25 @@ class ConversationsResource:
         if agent_id:
             self.terminate(agent_id, id)
 
-    # ── Kept for backwards compat but may not be supported by backend ──
-
     def list(
         self, *, agent_id: str | None = None, limit: int | None = None
     ) -> list[Conversation]:
-        """List conversations. Note: may not be available in all deployments."""
-        return []
+        """List conversations for an agent.
+
+        Returns [] if the endpoint returns 404 (not available in all deployments).
+        """
+        if not agent_id:
+            return []
+        path = f"/api/agent-app/v1/app/{agent_id}/conversations"
+        params: dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        try:
+            data = self._http.get(path, params=params or None)
+        except NotFoundError:
+            return []
+        items = _extract_list(data, "entries", "items", "list", "data")
+        return [_parse_conversation(d) for d in items]
 
     def get(self, id: str) -> Conversation:
         """Get conversation by ID. Note: may not be available in all deployments."""
@@ -143,8 +158,34 @@ class ConversationsResource:
         limit: int | None = None,
         offset: int | None = None,
     ) -> list[Message]:
-        """List messages. Note: may not be available in all deployments."""
-        return []
+        """List messages in a conversation.
+
+        Returns [] if the endpoint returns 404 (not available in all deployments).
+        """
+        path = f"/api/agent-app/v1/conversations/{conversation_id}/messages"
+        params: dict[str, Any] = {}
+        if limit is not None:
+            params["limit"] = limit
+        if offset is not None:
+            params["offset"] = offset
+        try:
+            data = self._http.get(path, params=params or None)
+        except NotFoundError:
+            return []
+        items = _extract_list(data, "entries", "items", "messages", "list", "data")
+        return [_parse_message_item(d) for d in items]
+
+
+def _extract_list(data: Any, *keys: str) -> list[Any]:
+    """Extract list from response dict or return data if already a list."""
+    if isinstance(data, list):
+        return data
+    if isinstance(data, dict):
+        for k in keys:
+            v = data.get(k)
+            if isinstance(v, list):
+                return v
+    return []
 
 
 def _parse_conversation(d: Any) -> Conversation:
@@ -157,15 +198,55 @@ def _parse_conversation(d: Any) -> Conversation:
     )
 
 
+def _parse_message_item(d: Any) -> Message:
+    """Parse a message from list_messages response."""
+    content = d.get("content", "")
+    if isinstance(content, dict):
+        content = content.get("text", content.get("answer", str(content)))
+    refs = [Reference(**r) for r in (d.get("references") or []) if isinstance(r, dict)]
+    return Message(
+        id=str(d.get("id", d.get("message_id", ""))),
+        role=d.get("role", "assistant"),
+        content=str(content) if content else "",
+        references=refs,
+        timestamp=d.get("timestamp", d.get("created_at", "")),
+        conversation_id=d.get("conversation_id", ""),
+    )
+
+
+def _extract_answer_text(d: Any) -> str:
+    """Extract answer text from various agent-app response layouts."""
+    msg = d.get("message") or d
+    content = msg.get("content")
+    if isinstance(content, dict):
+        fa = content.get("final_answer") or {}
+        ans = fa.get("answer")
+        if isinstance(ans, dict):
+            return ans.get("text", "")
+        if isinstance(ans, str):
+            return ans
+        return ""
+    if isinstance(content, str) and content:
+        return content
+    return d.get("answer") or msg.get("answer") or ""
+
+
 def _parse_message(d: Any) -> Message:
     refs = [Reference(**r) for r in (d.get("references") or [])]
-    # agent-app response format: answer field contains the reply
-    content = d.get("content") or d.get("answer") or ""
-    msg_id = d.get("id") or d.get("message_id") or d.get("assistant_message_id") or ""
+    content = _extract_answer_text(d)
+    msg = d.get("message") or d
+    msg_id = (
+        msg.get("id")
+        or d.get("assistant_message_id")
+        or d.get("message_id")
+        or ""
+    )
+    conv_id = d.get("conversation_id") or msg.get("conversation_id") or ""
     return Message(
         id=str(msg_id),
-        role=d.get("role", "assistant"),
+        role=msg.get("role", "assistant"),
         content=content,
         references=refs,
-        timestamp=d.get("timestamp") or d.get("created_at") or "",
+        timestamp=msg.get("timestamp") or d.get("created_at") or "",
+        conversation_id=conv_id,
     )

@@ -6,7 +6,7 @@
 
 | 命令 | 说明 |
 |------|------|
-| `kweaver agent list [--keyword <text>]` | 列出已发布 Agent |
+| `kweaver agent list [--keyword <text>] [--offset N] [--limit N]` | 列出已发布 Agent |
 | `kweaver agent chat <agent-id> -m "<message>" [--conversation-id <id>]` | 发送单轮消息 |
 | `kweaver agent sessions <agent-id>` | 列出与某个 Agent 的历史会话 |
 | `kweaver agent history <conversation-id> [--limit N]` | 查看某次会话的完整消息记录 |
@@ -16,11 +16,14 @@
 ### 发现 Agent
 
 ```bash
-# 列出已发布的 Agent
+# 列出已发布的 Agent（与 bkn list 一致：--offset 默认 0，--limit 默认 50）
 kweaver agent list
 
 # 按关键词筛选
 kweaver agent list --keyword "供应链"
+
+# 分页
+kweaver agent list --offset 0 --limit 20
 ```
 
 ### 首轮对话

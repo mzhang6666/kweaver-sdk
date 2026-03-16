@@ -16,6 +16,14 @@
 | `kweaver bkn update <kn-id> [options]` | 更新网络 |
 | `kweaver bkn delete <kn-id> [--yes]` | 删除网络（默认需确认） |
 
+### Schema 列表（ontology-manager）
+
+| 命令 | 说明 |
+|------|------|
+| `kweaver bkn object-type list <kn-id>` | 列出对象类 |
+| `kweaver bkn relation-type list <kn-id>` | 列出关系类 |
+| `kweaver bkn action-type list <kn-id>` | 列出行动类 |
+
 ### 查询（ontology-query 只读）
 
 | 命令 | 说明 |

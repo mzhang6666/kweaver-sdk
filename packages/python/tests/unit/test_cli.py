@@ -92,6 +92,9 @@ def test_kn_list(runner):
     with patch("kweaver.cli.kn.make_client") as mock_make:
         client = _mock_client()
         mock_kn = MagicMock()
+        mock_kn.id = "kn1"
+        mock_kn.name = "test"
+        mock_kn.comment = ""
         mock_kn.model_dump.return_value = {"id": "kn1", "name": "test"}
         client.knowledge_networks.list.return_value = [mock_kn]
         mock_make.return_value = client
@@ -114,6 +117,24 @@ def test_kn_get(runner):
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["id"] == "kn1"
+        client.knowledge_networks.get.assert_called_once_with("kn1", include_statistics=False)
+
+
+def test_kn_get_with_stats(runner):
+    with patch("kweaver.cli.kn.make_client") as mock_make:
+        client = _mock_client()
+        mock_kn = MagicMock()
+        mock_stats = MagicMock()
+        mock_stats.model_dump.return_value = {"object_types_total": 5}
+        mock_kn.statistics = mock_stats
+        client.knowledge_networks.get.return_value = mock_kn
+        mock_make.return_value = client
+
+        result = runner.invoke(cli, ["bkn", "get", "kn1", "--stats"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert data["object_types_total"] == 5
+        client.knowledge_networks.get.assert_called_once_with("kn1", include_statistics=True)
 
 
 def test_kn_export(runner):
@@ -126,6 +147,20 @@ def test_kn_export(runner):
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert "object_types" in data
+
+
+def test_kn_get_with_export(runner):
+    with patch("kweaver.cli.kn.make_client") as mock_make:
+        client = _mock_client()
+        client.knowledge_networks.export.return_value = {"object_types": [], "relation_types": []}
+        mock_make.return_value = client
+
+        result = runner.invoke(cli, ["bkn", "get", "kn1", "--export"])
+        assert result.exit_code == 0
+        data = json.loads(result.output)
+        assert "object_types" in data
+        assert "relation_types" in data
+        client.knowledge_networks.export.assert_called_once_with("kn1")
 
 
 def test_kn_build_wait(runner):
@@ -294,6 +329,7 @@ def test_agent_list(runner):
     with patch("kweaver.cli.agent.make_client") as mock_make:
         client = _mock_client()
         mock_agent = MagicMock()
+        mock_agent.id = "a1"
         mock_agent.name = "assistant"
         mock_agent.description = "test"
         mock_agent.model_dump.return_value = {"id": "a1", "name": "assistant"}
@@ -310,6 +346,7 @@ def test_agent_list_keyword(runner):
     with patch("kweaver.cli.agent.make_client") as mock_make:
         client = _mock_client()
         mock_a1 = MagicMock()
+        mock_a1.id = "a1"
         mock_a1.name = "supply-chain"
         mock_a1.description = "Supply chain assistant"
         mock_a1.model_dump.return_value = {"id": "a1", "name": "supply-chain"}
@@ -319,7 +356,7 @@ def test_agent_list_keyword(runner):
 
         result = runner.invoke(cli, ["agent", "list", "--keyword", "supply"])
         assert result.exit_code == 0
-        client.agents.list.assert_called_once_with(keyword="supply", status=None, size=48)
+        client.agents.list.assert_called_once_with(keyword="supply", status=None, offset=0, limit=50)
         data = json.loads(result.output)
         assert len(data) == 1
         assert data[0]["name"] == "supply-chain"
@@ -803,6 +840,7 @@ def test_kn_stats(runner):
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert data["object_types_total"] == 3
+        client.knowledge_networks.get.assert_called_once_with("kn1", include_statistics=True)
 
 
 def test_kn_update(runner):
@@ -821,6 +859,9 @@ def test_kn_list_with_pagination(runner):
     with patch("kweaver.cli.kn.make_client") as mock_make:
         client = _mock_client()
         mock_kn = MagicMock()
+        mock_kn.id = "kn1"
+        mock_kn.name = "alpha"
+        mock_kn.comment = ""
         mock_kn.model_dump.return_value = {"id": "kn1", "name": "alpha", "tags": ["demo"]}
         client.knowledge_networks.list.return_value = [mock_kn]
         mock_make.return_value = client
@@ -850,16 +891,21 @@ def test_kn_action_log_cancel_with_yes(runner):
 # ---------------------------------------------------------------------------
 
 
-def test_agent_list_with_size(runner):
+def test_agent_list_with_offset_limit(runner):
     with patch("kweaver.cli.agent.make_client") as mock_make:
         client = _mock_client()
         mock_agent = MagicMock()
+        mock_agent.id = "a1"
+        mock_agent.name = "MyAgent"
+        mock_agent.description = ""
         mock_agent.model_dump.return_value = {"id": "a1", "name": "MyAgent"}
         client.agents.list.return_value = [mock_agent]
         mock_make.return_value = client
-        result = runner.invoke(cli, ["agent", "list", "--size", "10"])
+        result = runner.invoke(cli, ["agent", "list", "--offset", "10", "--limit", "20"])
         assert result.exit_code == 0
-        client.agents.list.assert_called_once_with(keyword=None, status=None, size=10)
+        client.agents.list.assert_called_once_with(
+            keyword=None, status=None, offset=10, limit=20
+        )
 
 
 # ---------------------------------------------------------------------------

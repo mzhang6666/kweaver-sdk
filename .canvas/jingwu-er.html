@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>警务网络 — 实体关系图</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;600;700&family=JetBrains+Mono:wght@400;600&display=swap');
+
+  :root {
+    --bg: #0b0f1a;
+    --surface: #111827;
+    --border: #1e2d45;
+    --accent-blue: #3b82f6;
+    --accent-cyan: #06b6d4;
+    --accent-amber: #f59e0b;
+    --accent-rose: #f43f5e;
+    --accent-violet: #8b5cf6;
+    --accent-emerald: #10b981;
+    --text-primary: #e2e8f0;
+    --text-secondary: #64748b;
+    --text-muted: #334155;
+    --pk-badge: #f59e0b;
+    --tag-string: #06b6d4;
+    --tag-integer: #8b5cf6;
+    --tag-timestamp: #64748b;
+    --tag-datetime: #10b981;
+    --tag-text: #f43f5e;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    font-family: 'Noto Sans SC', sans-serif;
+    color: var(--text-primary);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    padding: 28px 48px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+  }
+  header h1 {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: var(--text-primary);
+  }
+  header .kn-id {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    color: var(--text-secondary);
+    padding: 3px 8px;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+  header .source-badge {
+    font-size: 11px;
+    color: var(--accent-cyan);
+    opacity: 0.7;
+    margin-left: auto;
+  }
+
+  .canvas-wrap {
+    padding: 40px 48px 60px;
+    overflow: auto;
+  }
+
+  svg#diagram {
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* Entity card styles via foreignObject */
+  .entity-card {
+    background: var(--surface);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    overflow: hidden;
+    width: 100%;
+    height: 100%;
+    transition: border-color 0.2s;
+  }
+  .entity-card:hover { border-color: var(--accent-blue); }
+
+  .entity-header {
+    padding: 10px 14px 9px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .entity-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .entity-name {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+  }
+  .entity-pk-hint {
+    margin-left: auto;
+    font-size: 9px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--pk-badge);
+    opacity: 0.75;
+    white-space: nowrap;
+  }
+
+  .entity-fields {
+    padding: 6px 0 8px;
+  }
+  .field-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 14px;
+    font-size: 11px;
+  }
+  .field-row.pk { background: rgba(245,158,11,0.06); }
+  .field-name {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text-primary);
+    font-size: 10.5px;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .field-name.pk-field { color: var(--pk-badge); }
+  .field-display {
+    font-size: 10px;
+    color: var(--text-secondary);
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .type-tag {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    padding: 1px 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+    opacity: 0.85;
+  }
+  .type-string  { background: rgba(6,182,212,0.15);  color: var(--tag-string); }
+  .type-integer { background: rgba(139,92,246,0.15); color: var(--tag-integer); }
+  .type-timestamp { background: rgba(100,116,139,0.15); color: var(--tag-timestamp); }
+  .type-datetime  { background: rgba(16,185,129,0.15); color: var(--tag-datetime); }
+  .type-text    { background: rgba(244,63,94,0.15);  color: var(--tag-text); }
+
+  .field-sep {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 4px 14px;
+    opacity: 0.5;
+  }
+
+  /* Legend */
+  .legend {
+    display: flex;
+    gap: 24px;
+    align-items: center;
+    padding: 0 48px 32px;
+    flex-wrap: wrap;
+  }
+  .legend-item { display: flex; align-items: center; gap: 7px; font-size: 11px; color: var(--text-secondary); }
+  .legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+  .legend-line { display: flex; align-items: center; gap: 6px; }
+  .legend-arrow { width: 28px; height: 2px; background: var(--text-muted); position: relative; }
+  .legend-arrow::after { content:''; position:absolute; right:-1px; top:-3px; border:4px solid transparent; border-left-color: var(--text-muted); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>警务网络 — 实体关系图</h1>
+  <span class="kn-id">d5iv6c9818p72mpje8pg</span>
+  <span class="source-badge">数据来源: kweaver bkn object-type list / relation-type list</span>
+</header>
+
+<div class="legend">
+  <div class="legend-item"><div class="legend-dot" style="background:#3b82f6"></div>报警事件（核心实体）</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f59e0b"></div>警局片区</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#10b981"></div>警员信息</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#8b5cf6"></div>接警反馈</div>
+  <div class="legend-item"><div class="legend-dot" style="background:#f43f5e"></div>警情状态</div>
+  <div class="legend-item" style="margin-left:16px">
+    <span style="font-family:monospace;color:#f59e0b;font-size:10px">PK</span>
+    <span>主键字段</span>
+  </div>
+</div>
+
+<div class="canvas-wrap">
+<svg id="diagram" width="1100" height="820" viewBox="0 0 1100 820" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#3b82f6" opacity="0.7"/>
+    </marker>
+    <marker id="arrow-dv" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L8,3 z" fill="#8b5cf6" opacity="0.7"/>
+    </marker>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge><feMergeNode in="coloredBlur"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background grid subtle -->
+  <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+    <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#1e2d45" stroke-width="0.4" opacity="0.5"/>
+  </pattern>
+  <rect width="1100" height="820" fill="url(#grid)"/>
+
+  <!-- ═══ RELATIONS (draw behind cards) ═══ -->
+
+  <!-- 报警事件 → 警局片区: 所属片区 (direct) -->
+  <!-- 报警事件 center: (370, 215)  警局片区 center: (130, 215) -->
+  <g>
+    <line x1="350" y1="210" x2="270" y2="210"
+      stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="none"
+      marker-end="url(#arrow)" opacity="0.75"/>
+    <text x="308" y="200" font-size="10" fill="#f59e0b" text-anchor="middle"
+      font-family="Noto Sans SC, sans-serif" opacity="0.9">所属片区</text>
+    <text x="308" y="223" font-size="9" fill="#64748b" text-anchor="middle"
+      font-family="JetBrains Mono, monospace">direct</text>
+  </g>
+
+  <!-- 报警事件 → 警员信息: 接警人员信息 (data_view) -->
+  <!-- 报警事件 center: (570, 215)  警员信息 center: (810, 130) -->
+  <g>
+    <path d="M 590 180 C 650 120 740 120 790 130"
+      fill="none" stroke="#8b5cf6" stroke-width="1.8"
+      marker-end="url(#arrow-dv)" opacity="0.75"/>
+    <text x="688" y="114" font-size="10" fill="#8b5cf6" text-anchor="middle"
+      font-family="Noto Sans SC, sans-serif" opacity="0.9">接警人员信息</text>
+    <text x="688" y="127" font-size="9" fill="#64748b" text-anchor="middle"
+      font-family="JetBrains Mono, monospace">data_view</text>
+  </g>
+
+  <!-- 报警事件 → 接警反馈: 接警处理结果 (direct) -->
+  <!-- 报警事件 center right: (610, 300)  接警反馈 center left: (790, 430) -->
+  <g>
+    <path d="M 610 300 C 660 380 730 400 790 430"
+      fill="none" stroke="#3b82f6" stroke-width="1.8"
+      marker-end="url(#arrow)" opacity="0.75"/>
+    <text x="700" y="378" font-size="10" fill="#3b82f6" text-anchor="middle"
+      font-family="Noto Sans SC, sans-serif" opacity="0.9">接警处理结果</text>
+    <text x="700" y="391" font-size="9" fill="#64748b" text-anchor="middle"
+      font-family="JetBrains Mono, monospace">direct</text>
+  </g>
+
+  <!-- 接警反馈 → 警情状态: 案件所处状态 (direct) -->
+  <!-- 接警反馈 center: (900, 480)  警情状态 center: (900, 640) -->
+  <g>
+    <line x1="900" y1="530" x2="900" y2="600"
+      stroke="#f43f5e" stroke-width="1.8"
+      marker-end="url(#arrow)" opacity="0.75"/>
+    <text x="934" y="568" font-size="10" fill="#f43f5e" text-anchor="middle"
+      font-family="Noto Sans SC, sans-serif" opacity="0.9">案件所处状态</text>
+    <text x="934" y="581" font-size="9" fill="#64748b" text-anchor="middle"
+      font-family="JetBrains Mono, monospace">direct</text>
+  </g>
+
+  <!-- ═══ ENTITY: 警局片区 ═══ x=20, y=80, w=220, h=180 -->
+  <foreignObject x="20" y="80" width="220" height="175">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="entity-card">
+      <div class="entity-header">
+        <div class="entity-dot" style="background:#f59e0b"></div>
+        <span class="entity-name" style="color:#f59e0b">警局片区</span>
+        <span class="entity-pk-hint">PK: id</span>
+      </div>
+      <div class="entity-fields">
+        <div class="field-row pk">
+          <span class="field-name pk-field">id</span>
+          <span class="field-display">主键ID</span>
+          <span class="type-tag type-integer">integer</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">district_name</span>
+          <span class="field-display">片区名称</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <hr class="field-sep"/>
+        <div class="field-row">
+          <span class="field-name">created_at</span>
+          <span class="field-display">创建时间</span>
+          <span class="type-tag type-timestamp">ts</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">updated_at</span>
+          <span class="field-display">更新时间</span>
+          <span class="type-tag type-timestamp">ts</span>
+        </div>
+      </div>
+    </div>
+  </foreignObject>
+
+  <!-- ═══ ENTITY: 报警事件 ═══ x=350, y=80, w=260, h=340 -->
+  <foreignObject x="350" y="80" width="260" height="360">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="entity-card" style="border-color:#3b82f6">
+      <div class="entity-header" style="background:rgba(59,130,246,0.08)">
+        <div class="entity-dot" style="background:#3b82f6"></div>
+        <span class="entity-name" style="color:#3b82f6">报警事件</span>
+        <span class="entity-pk-hint">PK: event_number</span>
+      </div>
+      <div class="entity-fields">
+        <div class="field-row pk">
+          <span class="field-name pk-field">event_number</span>
+          <span class="field-display">事件编号</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">alarm_reason</span>
+          <span class="field-display">报警原由</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">alarm_time</span>
+          <span class="field-display">报警时间</span>
+          <span class="type-tag type-datetime">dt</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">case_category</span>
+          <span class="field-display">案件类别</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">contact_phone</span>
+          <span class="field-display">联系电话</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">district_id</span>
+          <span class="field-display">所属片区ID</span>
+          <span class="type-tag type-integer">integer</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">incident_address</span>
+          <span class="field-display">事发地址</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">incident_details</span>
+          <span class="field-display">事件详情</span>
+          <span class="type-tag type-text">text</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">reporter_name</span>
+          <span class="field-display">报警人姓名</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">is_false_alarm</span>
+          <span class="field-display">是否误报</span>
+          <span class="type-tag type-integer">integer</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">officer_badge</span>
+          <span class="field-display">处理警员警号</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">unit_name</span>
+          <span class="field-display">处理单位</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+      </div>
+    </div>
+  </foreignObject>
+
+  <!-- ═══ ENTITY: 警员信息 ═══ x=790, y=40, w=220, h=190 -->
+  <foreignObject x="790" y="40" width="240" height="190">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="entity-card">
+      <div class="entity-header">
+        <div class="entity-dot" style="background:#10b981"></div>
+        <span class="entity-name" style="color:#10b981">警员信息</span>
+        <span class="entity-pk-hint">PK: officer_badge</span>
+      </div>
+      <div class="entity-fields">
+        <div class="field-row pk">
+          <span class="field-name pk-field">officer_badge</span>
+          <span class="field-display">警号</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">unit_name</span>
+          <span class="field-display">所属单位</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">id</span>
+          <span class="field-display">主键ID</span>
+          <span class="type-tag type-integer">integer</span>
+        </div>
+        <hr class="field-sep"/>
+        <div class="field-row">
+          <span class="field-name">created_at</span>
+          <span class="field-display">创建时间</span>
+          <span class="type-tag type-timestamp">ts</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">updated_at</span>
+          <span class="field-display">更新时间</span>
+          <span class="type-tag type-timestamp">ts</span>
+        </div>
+      </div>
+    </div>
+  </foreignObject>
+
+  <!-- ═══ ENTITY: 接警反馈 ═══ x=790, y=380, w=230, h=230 -->
+  <foreignObject x="790" y="370" width="240" height="230">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="entity-card">
+      <div class="entity-header">
+        <div class="entity-dot" style="background:#8b5cf6"></div>
+        <span class="entity-name" style="color:#8b5cf6">接警反馈</span>
+        <span class="entity-pk-hint">PK: event_number</span>
+      </div>
+      <div class="entity-fields">
+        <div class="field-row pk">
+          <span class="field-name pk-field">event_number</span>
+          <span class="field-display">关联事件编号</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">feedback_content</span>
+          <span class="field-display">反馈内容</span>
+          <span class="type-tag type-text">text</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">feedback_reason</span>
+          <span class="field-display">反馈原由</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">feedback_case_category</span>
+          <span class="field-display">反馈案件类别</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">feedback_case_type</span>
+          <span class="field-display">反馈案件类型</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">feedback_time</span>
+          <span class="field-display">反馈时间</span>
+          <span class="type-tag type-datetime">dt</span>
+        </div>
+        <hr class="field-sep"/>
+        <div class="field-row">
+          <span class="field-name">created_at</span>
+          <span class="field-display">创建时间</span>
+          <span class="type-tag type-timestamp">ts</span>
+        </div>
+      </div>
+    </div>
+  </foreignObject>
+
+  <!-- ═══ ENTITY: 警情状态 ═══ x=790, y=640, w=230, h=160 -->
+  <foreignObject x="790" y="630" width="240" height="165">
+    <div xmlns="http://www.w3.org/1999/xhtml" class="entity-card">
+      <div class="entity-header">
+        <div class="entity-dot" style="background:#f43f5e"></div>
+        <span class="entity-name" style="color:#f43f5e">警情状态</span>
+        <span class="entity-pk-hint">PK: event_number</span>
+      </div>
+      <div class="entity-fields">
+        <div class="field-row pk">
+          <span class="field-name pk-field">event_number</span>
+          <span class="field-display">关联事件编号</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">feedback_status</span>
+          <span class="field-display">反馈状态</span>
+          <span class="type-tag type-string">string</span>
+        </div>
+        <div class="field-row">
+          <span class="field-name">feedback_time</span>
+          <span class="field-display">反馈时间</span>
+          <span class="type-tag type-datetime">dt</span>
+        </div>
+        <hr class="field-sep"/>
+        <div class="field-row">
+          <span class="field-name">created_at</span>
+          <span class="field-display">创建时间</span>
+          <span class="type-tag type-timestamp">ts</span>
+        </div>
+      </div>
+    </div>
+  </foreignObject>
+
+</svg>
+</div>
+
+</body>
+</html>

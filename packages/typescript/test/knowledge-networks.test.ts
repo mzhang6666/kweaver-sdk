@@ -7,6 +7,9 @@ import {
   createKnowledgeNetwork,
   updateKnowledgeNetwork,
   deleteKnowledgeNetwork,
+  listObjectTypes,
+  listRelationTypes,
+  listActionTypes,
 } from "../src/api/knowledge-networks.js";
 
 const originalFetch = globalThis.fetch;
@@ -137,6 +140,65 @@ test("deleteKnowledgeNetwork maps method and path", async () => {
       accessToken: "token-abc",
       knId: "kn-123",
     });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("listObjectTypes maps path and params", async () => {
+  globalThis.fetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.toString());
+    assert.equal(url.pathname, "/api/ontology-manager/v1/knowledge-networks/kn-1/object-types");
+    assert.equal(url.searchParams.get("branch"), "main");
+    assert.equal(url.searchParams.get("limit"), "-1");
+    return new Response("[{\"id\":\"ot-1\",\"name\":\"Product\"}]", { status: 200 });
+  };
+
+  try {
+    const body = await listObjectTypes({
+      baseUrl: "https://dip.aishu.cn",
+      accessToken: "token",
+      knId: "kn-1",
+    });
+    assert.ok(body.includes("ot-1"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("listRelationTypes maps path and params", async () => {
+  globalThis.fetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.toString());
+    assert.equal(url.pathname, "/api/ontology-manager/v1/knowledge-networks/kn-1/relation-types");
+    return new Response("[{\"id\":\"rt-1\",\"name\":\"Product_Inventory\"}]", { status: 200 });
+  };
+
+  try {
+    const body = await listRelationTypes({
+      baseUrl: "https://dip.aishu.cn",
+      accessToken: "token",
+      knId: "kn-1",
+    });
+    assert.ok(body.includes("rt-1"));
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("listActionTypes maps path and params", async () => {
+  globalThis.fetch = async (input) => {
+    const url = new URL(typeof input === "string" ? input : input.toString());
+    assert.equal(url.pathname, "/api/ontology-manager/v1/knowledge-networks/kn-1/action-types");
+    return new Response("[{\"id\":\"at-1\",\"name\":\"CreateOrder\"}]", { status: 200 });
+  };
+
+  try {
+    const body = await listActionTypes({
+      baseUrl: "https://dip.aishu.cn",
+      accessToken: "token",
+      knId: "kn-1",
+    });
+    assert.ok(body.includes("at-1"));
   } finally {
     globalThis.fetch = originalFetch;
   }
