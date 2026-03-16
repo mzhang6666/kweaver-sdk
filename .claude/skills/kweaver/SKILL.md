@@ -14,7 +14,7 @@ requires:
 
 # KWeaver CLI
 
-KWeaver 平台的命令行工具，覆盖认证、知识网络管理与查询、Agent 对话、Context Loader 检索、通用 API 调用五大能力。
+KWeaver 平台的命令行工具，覆盖认证、知识网络管理与查询、Agent 对话、Context Loader 检索、通用 API 调用。
 
 ## 安装
 
@@ -42,119 +42,27 @@ CLI 按以下顺序尝试认证（无需用户干预）：
 
 ---
 
-## 命令速查
+## 命令组总览
 
-### 认证 (auth)
-
-```bash
-kweaver auth login <platform-url>                # 浏览器 OAuth2 登录
-kweaver auth login <platform-url> --alias prod   # 登录并设别名
-kweaver auth status                              # 当前认证状态
-kweaver auth list                                # 已保存的平台
-kweaver auth use <platform|alias>                # 切换平台
-kweaver auth delete <platform|alias>             # 删除平台配置
-kweaver auth logout                              # 登出
-kweaver token                                    # 打印当前 access token
-```
-
-### 知识网络 (bkn)
-
-```bash
-kweaver bkn list [options]                        # 列出知识网络
-kweaver bkn get <kn-id> [options]                 # 查看详情
-kweaver bkn stats <kn-id>                          # 查看统计
-kweaver bkn export <kn-id>                         # 导出定义
-kweaver bkn create [options]                      # 创建网络
-kweaver bkn update <kn-id> [options]              # 更新网络
-kweaver bkn delete <kn-id> [--yes]                 # 删除（默认需确认）
-kweaver bkn object-type query <kn-id> <ot-id> ['<json>']   # 对象实例查询
-kweaver bkn object-type properties <kn-id> <ot-id> '<json>' # 对象属性查询
-kweaver bkn subgraph <kn-id> '<json>'              # 子图查询
-kweaver bkn action-type query <kn-id> <at-id> '<json>'     # 行动信息查询
-kweaver bkn action-type execute <kn-id> <at-id> '<json>' [--wait] # 执行行动
-kweaver bkn action-execution get <kn-id> <execution-id>    # 获取执行状态
-kweaver bkn action-log list <kn-id> [options]     # 列出执行日志
-kweaver bkn action-log get <kn-id> <log-id>       # 查看执行日志
-kweaver bkn action-log cancel <kn-id> <log-id>    # 取消执行
-```
-
-### Agent (agent)
-
-```bash
-kweaver agent list [options]                      # 列出已发布 Agent
-kweaver agent chat <agent-id> [-m "message"]      # 与 Agent 对话（支持交互式 TUI）
-kweaver agent sessions <agent-id>                 # 列出会话
-kweaver agent history <conversation-id>           # 查看消息历史
-```
-
-### Context Loader
-
-```bash
-kweaver context-loader config set --kn-id <id>    # 配置当前知识网络
-kweaver context-loader config use <name>          # 切换配置
-kweaver context-loader config list                # 列出所有配置
-kweaver context-loader config show                # 查看当前配置
-kweaver context-loader kn-search "<query>"        # 检索 schema
-kweaver context-loader query-object-instance '<json>'  # 查询实例
-kweaver context-loader query-instance-subgraph '<json>' # 子图
-kweaver context-loader get-logic-properties '<json>'    # 逻辑属性
-kweaver context-loader get-action-info '<json>'         # 行动信息
-```
-
-### 通用 API 调用 (call)
-
-```bash
-kweaver call <path>                               # GET（自动注入认证）
-kweaver call <path> -X POST -d '<json>'           # POST
-kweaver call <path> -H "Name: Value" -bd <domain> # 自定义 header、业务域
-```
+| 命令组 | 说明 |
+|--------|------|
+| `auth` | 认证管理（login/status/list/use/delete/logout） |
+| `bkn` | 知识网络管理与查询（list/get/create/update/delete/export/stats；object-type、subgraph、action-type、action-log） |
+| `agent` | Agent 对话（list、chat、sessions、history） |
+| `context-loader` | 分层检索（config、kn-search、query-object-instance、query-instance-subgraph、get-logic-properties、get-action-info） |
+| `call` | 通用 API 调用（GET/POST，自动注入认证） |
+| `token` | 打印当前 access token |
 
 ---
 
-## 操作手册
+## 按需阅读
 
-### 1. 探索已有知识网络
+需要具体命令形态、参数或编排时，读取以下 reference 文件：
 
-```bash
-kweaver bkn list
-kweaver bkn get <kn-id> --stats
-kweaver bkn export <kn-id>
-```
-
-### 2. 查询知识网络数据
-
-```bash
-# 通过 Context Loader 分层检索
-kweaver context-loader config set --kn-id <kn-id>
-kweaver context-loader kn-search "高血压 治疗 药品" --only-schema --pretty
-
-# 直接查询对象实例
-kweaver bkn object-type query <kn-id> <ot-id> --limit 10 --pretty
-```
-
-### 3. Agent 对话
-
-```bash
-kweaver agent list
-kweaver agent chat <agent-id> -m "华东仓库库存情况"
-kweaver agent sessions <agent-id>
-kweaver agent history <conversation-id>
-```
-
-### 4. 执行 Action
-
-```bash
-kweaver bkn action-type execute <kn-id> <at-id> '{"params":{}}' --wait
-kweaver bkn action-log list <kn-id>
-kweaver bkn action-log get <kn-id> <log-id>
-```
-
----
-
-## BKN 与 Context Loader 的边界
-
-- **bkn**：直接调用 ontology-query 原生接口，适合已知 `kn_id`、`ot_id`、`at_id` 且需透传 JSON 的场景
-- **context-loader**：schema → 实例 → 逻辑属性/行动信息 的分层检索工作流，适合 Agent 化检索（需先 `kn-search` 发现 schema，再逐层调用）
+- **BKN 管理/查询、Condition 语法、典型编排** → `skills/kweaver-core/references/bkn.md`
+- **Agent 对话、多轮会话、历史记录** → `skills/kweaver-core/references/agent.md`
+- **Action 执行、约束、日志** → `skills/kweaver-core/references/action.md`
+- **完整命令示例、端到端流程** → `skills/kweaver-core/references/examples.md`
 
 ---
 

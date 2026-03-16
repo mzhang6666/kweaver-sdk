@@ -129,6 +129,6 @@ kweaver query subgraph <kn-id> --start <ot-id> \
 
 ## 典型编排
 
-1. **从零构建**: `ds connect` -> `kn create` -> `kn build` -> `kn export` -> `query search`
-2. **探索已有**: `kn list` -> `kn export <id>` -> `query instances` / `query search`
+1. **从零构建**: `ds connect` -> `bkn create` -> `bkn build` -> `bkn export` -> `query search`
+2. **探索已有**: `bkn list` -> `bkn export <id>` -> `query instances` / `query search`
 3. **直接查询**: 已知 kn_id 时直接 `query search` 或 `query instances`
