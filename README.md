@@ -1,5 +1,7 @@
 # KWeaver SDK
 
+> Part of the [KWeaver](https://github.com/kweaver-ai/KWeaver) ecosystem — an open-source platform for building, managing, and querying knowledge networks.
+
 Give AI agents (Claude Code, GPT, custom agents, etc.) access to KWeaver knowledge networks and Decision Agents via the `kweaver` CLI. Also provides Python and TypeScript SDKs for programmatic integration.
 
 [中文文档](README.zh.md)

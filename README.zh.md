@@ -1,5 +1,7 @@
 # KWeaver SDK
 
+> [KWeaver](https://github.com/kweaver-ai/KWeaver) 生态项目 — 开源知识网络构建、管理与查询平台。
+
 [English](README.md)
 
 让 AI 智能体（Claude Code、GPT、自定义 Agent 等）通过 `kweaver` CLI 命令访问 KWeaver 平台的知识网络与 Decision Agent。同时提供 Python 和 TypeScript SDK 供程序化集成。
