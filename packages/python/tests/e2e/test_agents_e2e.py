@@ -30,17 +30,7 @@ def test_list_agents_published(kweaver_client: KWeaverClient):
 def any_agent(kweaver_client: KWeaverClient):
     """Find any agent for tests (published or not)."""
     agents = kweaver_client.agents.list()
-    if not agents:
-        pytest.skip("No agents found")
-    return agents[0]
-
-
-@pytest.fixture(scope="module")
-def published_agent(kweaver_client: KWeaverClient):
-    """Find a published agent for tests."""
-    agents = kweaver_client.agents.list(status="published")
-    if not agents:
-        pytest.skip("No published agents found")
+    assert agents, "No agents found — cannot proceed"
     return agents[0]
 
 
@@ -62,28 +52,35 @@ def test_agent_has_fields(kweaver_client: KWeaverClient, any_agent):
 
 
 @pytest.mark.destructive
-def test_conversation_flow(kweaver_client: KWeaverClient, published_agent):
+def test_conversation_flow(kweaver_client: KWeaverClient):
     """Create conversation, send message, verify response.
 
-    Note: if the agent has broken tool/knowledge config, the backend
-    may return 500. We accept that as "SDK wiring is correct" and
-    only fail on 4xx (wrong path / auth / params).
+    Tries all published agents until one responds successfully.
+    Fails if no published agent can produce a valid response.
     """
-    from kweaver._errors import ServerError
+    agents = kweaver_client.agents.list(status="published")
+    assert agents, "No published agents found"
 
-    conv = kweaver_client.conversations.create(published_agent.id)
-    assert conv.agent_id == published_agent.id
+    errors: list[tuple[str, Exception]] = []
+    for agent in agents:
+        conv = kweaver_client.conversations.create(agent.id)
+        assert conv.agent_id == agent.id
 
-    try:
-        reply = kweaver_client.conversations.send_message(
-            conv.id,
-            content="你好",
-            agent_id=published_agent.id,
-            agent_version=published_agent.version or "latest",
-        )
-        assert reply.content
-        assert reply.role == "assistant"
-    except ServerError:
-        # Agent config issue (missing tools, invalid KN, etc.)
-        # SDK path is correct since we got 500 not 404/401
-        pytest.skip("Agent returned 500 — likely broken config, SDK path OK")
+        try:
+            reply = kweaver_client.conversations.send_message(
+                conv.id,
+                content="你好",
+                agent_id=agent.id,
+                agent_version=agent.version or "latest",
+            )
+            assert reply.content
+            assert reply.role == "assistant"
+            return  # success — at least one agent works
+        except Exception as e:
+            errors.append((agent.name, e))
+            continue  # try next agent
+
+    error_details = "; ".join(f"[{name}] {e}" for name, e in errors)
+    pytest.fail(
+        f"All {len(agents)} published agents failed: {error_details}"
+    )

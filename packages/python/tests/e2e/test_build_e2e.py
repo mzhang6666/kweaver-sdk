@@ -11,8 +11,48 @@ from typing import Any
 import pytest
 
 from kweaver import KWeaverClient
+from kweaver._errors import AuthorizationError
 
 pytestmark = [pytest.mark.e2e, pytest.mark.destructive]
+
+
+def _get_or_create_kn(client: KWeaverClient, name: str, factory):
+    """Create a KN, or return the existing one if the name is taken."""
+    try:
+        return factory(name=name)
+    except AuthorizationError as e:
+        if "Existed" not in (e.error_code or ""):
+            raise
+    for kn in client.knowledge_networks.list(name=name):
+        if kn.name == name:
+            return kn
+    raise RuntimeError(f"KN '{name}' reported as existing but not found via list")
+
+
+def _get_or_create_ot(client: KWeaverClient, kn_id: str, name: str, **kwargs):
+    """Create an object type, or return the existing one if the name is taken."""
+    try:
+        return client.object_types.create(kn_id, name=name, **kwargs)
+    except AuthorizationError as e:
+        if "Existed" not in (e.error_code or ""):
+            raise
+    for ot in client.object_types.list(kn_id):
+        if ot.name == name:
+            return ot
+    raise RuntimeError(f"OT '{name}' reported as existing but not found via list")
+
+
+def _get_or_create_rt(client: KWeaverClient, kn_id: str, name: str, **kwargs):
+    """Create a relation type, or return the existing one if the name is taken."""
+    try:
+        return client.relation_types.create(kn_id, name=name, **kwargs)
+    except AuthorizationError as e:
+        if "Existed" not in (e.error_code or ""):
+            raise
+    for rt in client.relation_types.list(kn_id):
+        if rt.name == name:
+            return rt
+    raise RuntimeError(f"RT '{name}' reported as existing but not found via list")
 
 
 def test_dataview_create_from_table(
@@ -45,7 +85,7 @@ def test_build_knowledge_network(
     assert len(tables) > 0
     table = tables[0]
 
-    # 2. Create dataview
+    # 2. Create dataview (already idempotent — finds existing atomic view)
     dv = kweaver_client.dataviews.create(
         name=f"e2e_build_{table.name}",
         datasource_id=ds.id,
@@ -54,15 +94,14 @@ def test_build_knowledge_network(
     )
     assert dv.id
 
-    # 3. Create knowledge network
-    kn = create_knowledge_network(name="e2e_build_kn")
+    # 3. Create or reuse knowledge network
+    kn = _get_or_create_kn(kweaver_client, "e2e_build_kn", create_knowledge_network)
     assert kn.id
 
-    # 4. Create object type — pick first suitable column as PK
-    # Use kn.id[:8] suffix: KWeaver object type names are globally unique
+    # 4. Create or reuse object type
     pk_col = table.columns[0].name
-    ot = kweaver_client.object_types.create(
-        kn.id,
+    ot = _get_or_create_ot(
+        kweaver_client, kn.id,
         name=f"e2e_{table.name}_{kn.id[:8]}",
         dataview_id=dv.id,
         primary_keys=[pk_col],
@@ -86,23 +125,24 @@ def test_build_with_relation(
     dv1 = kweaver_client.dataviews.create(name=f"e2e_rel_{t1.name}", datasource_id=ds.id, table=t1.name, columns=t1.columns)
     dv2 = kweaver_client.dataviews.create(name=f"e2e_rel_{t2.name}", datasource_id=ds.id, table=t2.name, columns=t2.columns)
 
-    kn = create_knowledge_network(name="e2e_rel_kn")
+    kn = _get_or_create_kn(kweaver_client, "e2e_rel_kn", create_knowledge_network)
 
-    # Use kn.id[:8] suffix: KWeaver object type names are globally unique
-    ot1 = kweaver_client.object_types.create(
-        kn.id, name=f"e2e_{t1.name}_{kn.id[:8]}", dataview_id=dv1.id,
+    ot1 = _get_or_create_ot(
+        kweaver_client, kn.id, name=f"e2e_{t1.name}_{kn.id[:8]}",
+        dataview_id=dv1.id,
         primary_keys=[t1.columns[0].name], display_key=t1.columns[0].name,
     )
-    ot2 = kweaver_client.object_types.create(
-        kn.id, name=f"e2e_{t2.name}_{kn.id[:8]}", dataview_id=dv2.id,
+    ot2 = _get_or_create_ot(
+        kweaver_client, kn.id, name=f"e2e_{t2.name}_{kn.id[:8]}",
+        dataview_id=dv2.id,
         primary_keys=[t2.columns[0].name], display_key=t2.columns[0].name,
     )
     assert ot1.id
     assert ot2.id
 
-    # Create a direct relation using first column of each
-    rt = kweaver_client.relation_types.create(
-        kn.id,
+    # Create or reuse relation type
+    rt = _get_or_create_rt(
+        kweaver_client, kn.id,
         name=f"e2e_{t1.name}_{t2.name}_{kn.id[:8]}",
         source_ot_id=ot1.id,
         target_ot_id=ot2.id,
