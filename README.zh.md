@@ -295,7 +295,16 @@ make -C packages/typescript test
 ## 在 AI 智能体中使用
 
 ```bash
-npx skills add kweaver-ai/kweaver-sdk --skill kweaver-core
+npx skills add https://github.com/kweaver-ai/kweaver-sdk --skill kweaver-core
+```
+
+[![skills.sh](https://skills.sh/badge/kweaver-core)](https://skills.sh/kweaver-ai/kweaver-sdk)
+
+使用前需先安装 CLI 并完成认证：
+
+```bash
+npm install -g @kweaver-ai/kweaver-sdk
+kweaver auth login https://your-kweaver-instance.com
 ```
 
 详见 [skills/kweaver-core/SKILL.md](skills/kweaver-core/SKILL.md)。

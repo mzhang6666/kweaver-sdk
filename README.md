@@ -243,7 +243,16 @@ make -C packages/typescript test
 ## Using with AI Agents
 
 ```bash
-npx skills add kweaver-ai/kweaver-sdk --skill kweaver-core
+npx skills add https://github.com/kweaver-ai/kweaver-sdk --skill kweaver-core
+```
+
+[![skills.sh](https://skills.sh/badge/kweaver-core)](https://skills.sh/kweaver-ai/kweaver-sdk)
+
+Before using the skill, authenticate with your KWeaver instance:
+
+```bash
+npm install -g @kweaver-ai/kweaver-sdk
+kweaver auth login https://your-kweaver-instance.com
 ```
 
 See [skills/kweaver-core/SKILL.md](skills/kweaver-core/SKILL.md) for details.
