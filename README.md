@@ -9,7 +9,7 @@ Give AI agents (Claude Code, GPT, custom agents, etc.) access to KWeaver knowled
 ### TypeScript CLI (recommended — includes interactive agent chat TUI)
 
 ```bash
-npm install -g kweaver-sdk
+npm install -g @kweaver-ai/kweaver-sdk
 ```
 
 Requires Node.js 22+. After installation, use the `kweaver` command.
@@ -17,11 +17,11 @@ Requires Node.js 22+. After installation, use the `kweaver` command.
 ### TypeScript SDK (programmatic)
 
 ```bash
-npm install kweaver-sdk
+npm install @kweaver-ai/kweaver-sdk
 ```
 
 ```typescript
-import { KWeaverClient } from "kweaver-sdk";
+import { KWeaverClient } from "@kweaver-ai/kweaver-sdk";
 
 // Zero-config: reads credentials saved by `kweaver auth login`
 const client = new KWeaverClient();
@@ -65,8 +65,8 @@ print(reply.content)
 
 | Entry point | Install | Purpose |
 |-------------|---------|---------|
-| **TS CLI** | `npm install -g kweaver-sdk` | Primary CLI with Ink TUI and streaming agent chat |
-| **TS SDK** | `npm install kweaver-sdk` | Programmatic API — `import { KWeaverClient } from "kweaver-sdk"` |
+| **TS CLI** | `npm install -g @kweaver-ai/kweaver-sdk` | Primary CLI with Ink TUI and streaming agent chat |
+| **TS SDK** | `npm install @kweaver-ai/kweaver-sdk` | Programmatic API — `import { KWeaverClient } from "@kweaver-ai/kweaver-sdk"` |
 | **Python CLI** | `pip install kweaver-sdk[cli]` | Alternative CLI, feature-parity with TS CLI |
 | **Python SDK** | `pip install kweaver-sdk` | Programmatic API — `from kweaver import KWeaverClient` |
 
@@ -86,7 +86,7 @@ Or use environment variables: `KWEAVER_BASE_URL`, `KWEAVER_BUSINESS_DOMAIN`, `KW
 ### Simple API (recommended)
 
 ```typescript
-import kweaver from "kweaver-sdk/kweaver";
+import kweaver from "@kweaver-ai/kweaver-sdk/kweaver";
 
 // Uses saved credentials from `kweaver auth login`
 kweaver.configure({ config: true, bknId: "your-bkn-id", agentId: "your-agent-id" });
@@ -110,7 +110,7 @@ const agentList = await kweaver.agents();
 ### Full client API (advanced)
 
 ```typescript
-import { KWeaverClient } from "kweaver-sdk";
+import { KWeaverClient } from "@kweaver-ai/kweaver-sdk";
 
 const client = new KWeaverClient();   // reads ~/.kweaver/ credentials
 

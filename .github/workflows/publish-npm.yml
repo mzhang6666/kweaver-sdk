@@ -14,7 +14,7 @@ on:
 
 jobs:
   publish-npm:
-    name: Build & Publish TypeScript SDK → npmjs
+    name: Build & Publish @kweaver-ai/kweaver-sdk → npm
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -53,8 +53,9 @@ jobs:
 
       - name: Verify package version
         run: |
+          PKG_NAME=$(node -p "require('./package.json').name")
           PKG_VERSION=$(node -p "require('./package.json').version")
-          echo "Publishing kweaver-sdk@${PKG_VERSION} to npmjs"
+          echo "Publishing ${PKG_NAME}@${PKG_VERSION} to npm"
 
       - name: Publish to npm
         if: ${{ inputs.dry_run != true }}

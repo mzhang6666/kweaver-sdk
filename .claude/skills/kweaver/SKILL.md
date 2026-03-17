@@ -19,7 +19,7 @@ KWeaver 平台的命令行工具，覆盖认证、知识网络管理与查询、
 ## 安装
 
 ```bash
-npm install -g kweaver-sdk
+npm install -g @kweaver-ai/kweaver-sdk
 ```
 
 需 Node.js 22+。也可用 `npx kweaver` 临时运行。

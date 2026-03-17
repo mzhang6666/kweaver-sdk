@@ -9,7 +9,7 @@
 ### TypeScript CLI（推荐，含交互式 agent chat TUI）
 
 ```bash
-npm install -g kweaver-sdk
+npm install -g @kweaver-ai/kweaver-sdk
 ```
 
 需 Node.js 22+。安装后使用 `kweaver` 命令。
@@ -17,11 +17,11 @@ npm install -g kweaver-sdk
 ### TypeScript SDK（程序化调用）
 
 ```bash
-npm install kweaver-sdk
+npm install @kweaver-ai/kweaver-sdk
 ```
 
 ```typescript
-import { KWeaverClient } from "kweaver-sdk";
+import { KWeaverClient } from "@kweaver-ai/kweaver-sdk";
 
 // 使用 CLI 存好的凭据（kweaver auth login 之后零配置）
 const client = new KWeaverClient();
@@ -65,8 +65,8 @@ print(reply.content)
 
 | 入口 | 安装方式 | 用途 |
 |------|----------|------|
-| **TS CLI** | `npm install -g kweaver-sdk` | 主力 CLI，含 Ink 交互式 TUI、流式 agent chat |
-| **TS SDK** | `npm install kweaver-sdk` | 程序化 API，`import { KWeaverClient } from "kweaver-sdk"` |
+| **TS CLI** | `npm install -g @kweaver-ai/kweaver-sdk` | 主力 CLI，含 Ink 交互式 TUI、流式 agent chat |
+| **TS SDK** | `npm install @kweaver-ai/kweaver-sdk` | 程序化 API，`import { KWeaverClient } from "@kweaver-ai/kweaver-sdk"` |
 | **Python CLI** | `pip install kweaver-sdk[cli]` | 备用 CLI，功能对齐，用于测试或纯 Python 环境 |
 | **Python SDK** | `pip install kweaver-sdk` | 程序化 API，`from kweaver import KWeaverClient` |
 
@@ -86,7 +86,7 @@ kweaver auth login https://your-kweaver-instance.com --alias prod
 ### 简洁 API（推荐）
 
 ```typescript
-import kweaver from "kweaver-sdk/kweaver";
+import kweaver from "@kweaver-ai/kweaver-sdk/kweaver";
 
 // 使用 `kweaver auth login` 保存的凭据，零配置
 kweaver.configure({ config: true, bknId: "your-bkn-id", agentId: "your-agent-id" });
@@ -110,7 +110,7 @@ const agentList = await kweaver.agents();
 ### 底层客户端（高级用法）
 
 ```typescript
-import { KWeaverClient } from "kweaver-sdk";
+import { KWeaverClient } from "@kweaver-ai/kweaver-sdk";
 
 const client = new KWeaverClient();   // 读取 ~/.kweaver/ 凭据
 
