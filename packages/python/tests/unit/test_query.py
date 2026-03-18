@@ -101,34 +101,37 @@ def test_instances_iter():
 
 
 def test_kn_search(capture: RequestCapture):
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={
-            "object_types": [{"id": "ot_01", "name": "产品"}],
-            "relation_types": [],
-            "action_types": [],
-        })
+    from unittest.mock import patch, MagicMock
 
-    client = make_client(handler, capture)
-    result = client.query.kn_search("kn_01", "产品")
-    assert result.object_types is not None
-    assert len(result.object_types) == 1
-    body = capture.last_body()
-    assert body["kn_id"] == "kn_01"
-    assert body["query"] == "产品"
+    mock_cl = MagicMock()
+    mock_cl.kn_search.return_value = {
+        "object_types": [{"id": "ot_01", "name": "产品"}],
+        "relation_types": [],
+        "action_types": [],
+    }
+
+    with patch("kweaver.resources.context_loader.ContextLoaderResource", return_value=mock_cl):
+        client = make_client(lambda req: httpx.Response(200, json={}), capture)
+        result = client.query.kn_search("kn_01", "产品")
+        assert result.object_types is not None
+        assert len(result.object_types) == 1
+        mock_cl.kn_search.assert_called_once_with("产品", only_schema=False)
 
 
 def test_kn_search_only_schema(capture: RequestCapture):
-    def handler(req: httpx.Request) -> httpx.Response:
-        return httpx.Response(200, json={
-            "object_types": [],
-            "relation_types": [],
-            "action_types": [],
-        })
+    from unittest.mock import patch, MagicMock
 
-    client = make_client(handler, capture)
-    client.query.kn_search("kn_01", "产品", only_schema=True)
-    body = capture.last_body()
-    assert body["only_schema"] is True
+    mock_cl = MagicMock()
+    mock_cl.kn_search.return_value = {
+        "object_types": [],
+        "relation_types": [],
+        "action_types": [],
+    }
+
+    with patch("kweaver.resources.context_loader.ContextLoaderResource", return_value=mock_cl):
+        client = make_client(lambda req: httpx.Response(200, json={}), capture)
+        client.query.kn_search("kn_01", "产品", only_schema=True)
+        mock_cl.kn_search.assert_called_once_with("产品", only_schema=True)
 
 
 def test_object_type_properties(capture: RequestCapture):
