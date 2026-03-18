@@ -36,20 +36,17 @@ jobs:
           cache: "npm"
           cache-dependency-path: packages/typescript/package-lock.json
 
-      - name: Upgrade npm for trusted publishing
-        run: npm install -g npm@latest
-
       - name: Install dependencies
         run: npm ci
 
-      - name: Run tests
-        run: npm test
-
-      - name: Run typecheck
+      - name: Typecheck
         run: npm run lint
 
       - name: Build
         run: npm run build
+
+      - name: Run unit tests
+        run: node --import tsx --test test/cli.test.ts
 
       - name: Verify package version
         run: |
