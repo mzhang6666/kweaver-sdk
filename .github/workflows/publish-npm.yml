@@ -3,22 +3,15 @@ name: Publish to npm
 on:
   push:
     tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"       # e.g. v0.4.0
-      - "ts-v[0-9]+.[0-9]+.[0-9]+"    # e.g. ts-v0.4.0 (TypeScript-only release)
+      - "v*"
   workflow_dispatch:
-    inputs:
-      dry_run:
-        description: "Dry run (build only, skip npm publish)"
-        type: boolean
-        default: false
 
 jobs:
-  publish-npm:
-    name: Build & Publish @kweaver-ai/kweaver-sdk → npm
+  publish:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      id-token: write   # required for npm provenance
+      id-token: write
 
     defaults:
       run:
@@ -28,34 +21,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup Node.js
+      - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-          cache: "npm"
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+          cache: npm
           cache-dependency-path: packages/typescript/package-lock.json
+
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
 
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck
+      - name: Run typecheck
         run: npm run lint
 
-      - name: Build
-        run: npm run build
-
-      - name: Run unit tests
+      - name: Run tests
         run: node --import tsx --test test/cli.test.ts
 
-      - name: Verify package version
-        run: |
-          PKG_NAME=$(node -p "require('./package.json').name")
-          PKG_VERSION=$(node -p "require('./package.json').version")
-          echo "Publishing ${PKG_NAME}@${PKG_VERSION} to npm"
-
-      - name: Publish to npm
-        if: ${{ inputs.dry_run != true }}
+      - name: Publish package
         run: npm publish --provenance --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
