@@ -138,7 +138,14 @@ class QueryResource:
         ot_id: str,
         body: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        """Query object type property definitions and statistics."""
+        """Query instance property values for an object type.
+
+        Args:
+            kn_id: Knowledge network ID.
+            ot_id: Object type ID.
+            body: Request body with ``_instance_identities`` (list of identity dicts)
+                  and ``properties`` (list of property names to return).
+        """
         data = self._http.post(
             f"/api/ontology-query/v1/knowledge-networks/{kn_id}/object-types/{ot_id}/properties",
             json=body or {},

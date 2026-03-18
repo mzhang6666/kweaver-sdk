@@ -1306,7 +1306,7 @@ def test_object_type_properties(runner):
         assert result.exit_code == 0
         data = json.loads(result.output)
         assert "properties" in data
-        client.query.object_type_properties.assert_called_once_with("kn1", "ot1")
+        client.query.object_type_properties.assert_called_once_with("kn1", "ot1", body=None)
 
 
 def test_context_loader_config_set_no_active_platform(runner):

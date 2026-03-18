@@ -328,11 +328,17 @@ def object_type_delete(kn_id: str, ot_ids: str, yes: bool) -> None:
 @object_type_group.command("properties")
 @click.argument("kn_id")
 @click.argument("ot_id")
+@click.argument("body_json", default=None, required=False)
 @handle_errors
-def object_type_properties(kn_id: str, ot_id: str) -> None:
-    """Query object type property definitions and statistics."""
+def object_type_properties(kn_id: str, ot_id: str, body_json: str | None) -> None:
+    """Query instance property values.
+
+    Requires a JSON body with _instance_identities and properties list.
+    Example: '{"_instance_identities": [{"id": "123"}], "properties": ["name"]}'
+    """
+    body = json.loads(body_json) if body_json else None
     client = make_client()
-    data = client.query.object_type_properties(kn_id, ot_id)
+    data = client.query.object_type_properties(kn_id, ot_id, body=body)
     pp(data)
 
 

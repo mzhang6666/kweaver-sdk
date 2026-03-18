@@ -25,7 +25,7 @@
 | `kweaver bkn object-type create <kn-id> --name <name> --dataview-id <dv-id> --primary-key <pk> --display-key <dk> [--property '<json>']...` | 创建对象类 |
 | `kweaver bkn object-type update <kn-id> <ot-id> [--name <name>] [--display-key <dk>]` | 更新对象类 |
 | `kweaver bkn object-type delete <kn-id> <ot-ids> [--yes]` | 删除对象类 |
-| `kweaver bkn object-type properties <kn-id> <ot-id>` | 查询属性定义与统计 |
+| `kweaver bkn object-type properties <kn-id> <ot-id> '<json>'` | 查询实例属性值（需传 `_instance_identities` 和 `properties`） |
 | `kweaver bkn relation-type list <kn-id>` | 列出关系类 |
 | `kweaver bkn relation-type get <kn-id> <rt-id>` | 查看关系类详情 |
 | `kweaver bkn relation-type create <kn-id> --name <name> --source <ot-id> --target <ot-id> [--mapping src:tgt]...` | 创建关系类 |
