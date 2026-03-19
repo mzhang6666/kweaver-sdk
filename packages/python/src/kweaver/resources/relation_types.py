@@ -31,6 +31,7 @@ class RelationTypesResource:
     ) -> RelationType:
         entry: dict[str, Any] = {
             "name": name,
+            "branch": "main",
             "source_object_type_id": source_ot_id,
             "target_object_type_id": target_ot_id,
         }
@@ -70,7 +71,7 @@ class RelationTypesResource:
         try:
             data = self._http.post(
                 f"{_PREFIX}/knowledge-networks/{kn_id}/relation-types",
-                json={"entries": [entry], "branch": "main"},
+                json={"entries": [entry]},
             )
             items = data if isinstance(data, list) else data.get("entries", data.get("data", [data]))
             return _parse_relation_type(items[0], kn_id)

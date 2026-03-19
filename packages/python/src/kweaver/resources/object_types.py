@@ -39,6 +39,7 @@ class ObjectTypesResource:
 
         entry: dict[str, Any] = {
             "name": name,
+            "branch": "main",
             "data_source": {"type": "data_view", "id": dataview_id},
             "primary_keys": primary_keys,
             "display_key": display_key,
@@ -57,7 +58,7 @@ class ObjectTypesResource:
         try:
             data = self._http.post(
                 f"{_PREFIX}/knowledge-networks/{kn_id}/object-types",
-                json={"entries": [entry], "branch": "main"},
+                json={"entries": [entry]},
             )
             items = data if isinstance(data, list) else data.get("entries", data.get("data", [data]))
             return _parse_object_type(items[0], kn_id)
