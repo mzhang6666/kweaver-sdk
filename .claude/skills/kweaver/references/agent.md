@@ -1,31 +1,53 @@
 # Agent 命令参考
 
-Decision Agent 管理与对话。
+Decision Agent CRUD、发布管理与对话。
 
-## 命令
+## CRUD 命令
 
 ```bash
-kweaver agent list [--keyword <kw>] [--status published|draft] [--category-id <id>] [--offset 0] [--limit 50] [-v]
-kweaver agent get <agent_id> [-v]
-kweaver agent chat <agent_id> -m '<message>' [--conversation-id <id>]
-kweaver agent sessions <agent_id>
+kweaver agent list [--name <kw>] [--limit 50] [--verbose]
+kweaver agent get <agent_id> [--verbose]
+kweaver agent get-by-key <key>
+kweaver agent create --name <name> --profile <profile> --llm-id <model_id> [--key <key>] [--product-key DIP|AnyShare|ChatBI] [--system-prompt <sp>] [--llm-max-tokens 4096]
+kweaver agent update <agent_id> [--name <n>] [--profile <p>] [--system-prompt <sp>]
+kweaver agent delete <agent_id> [-y]
+```
+
+## 发布管理
+
+```bash
+kweaver agent publish <agent_id>
+kweaver agent unpublish <agent_id>
+```
+
+## 对话
+
+```bash
+kweaver agent chat <agent_id> -m '<message>' [--conversation-id <id>] [--stream/--no-stream]
+kweaver agent chat <agent_id>                    # 交互式模式
+kweaver agent sessions <agent_id> [--limit <n>]
 kweaver agent history <conversation_id> [--limit <n>]
 ```
+
+## 说明
+
+- `create` 需要 `--llm-id`，可通过模型工厂 API 查询可用 LLM：`GET /api/mf-model-manager/v1/llm/list?page=1&size=100`
+- `update` 采用 read-modify-write 模式：先 GET 当前配置，修改字段后 PUT 回去
+- `list` 只返回已发布的 agent；`get` 可以获取未发布的（需要是 owner）
+- `publish` 后 agent 才会出现在 `list` 里
 
 ## 端到端示例
 
 ```bash
-# 列出已发布的 Agent
-kweaver agent list --status published
-
-# 单轮对话
-kweaver agent chat ag-123 -m "分析最近的库存数据"
+# 创建 → 发布 → 对话 → 清理
+kweaver agent create --name "测试助手" --profile "SDK 测试用" --llm-id <model_id> --system-prompt "你是一个测试助手"
+kweaver agent publish <agent_id>
+kweaver agent chat <agent_id> -m "你好"
+kweaver agent unpublish <agent_id>
+kweaver agent delete <agent_id> -y
 
 # 多轮对话
-CONV_ID=$(kweaver agent chat ag-123 -m "你能做什么？" --format json | jq -r '.conversation_id')
-kweaver agent chat ag-123 -m "分析库存风险" --conversation-id "$CONV_ID"
-kweaver agent chat ag-123 -m "给出改进建议" --conversation-id "$CONV_ID"
-
-# 查看历史
-kweaver agent history "$CONV_ID"
+kweaver agent chat <agent_id> -m "分析库存数据" --no-stream
+kweaver agent chat <agent_id> -m "给出改进建议" --conversation-id <conv_id>
+kweaver agent history <conv_id>
 ```

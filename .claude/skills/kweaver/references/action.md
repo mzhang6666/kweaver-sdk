@@ -1,45 +1,40 @@
 # Action 命令参考
 
-Action Type 查询与执行。**`execute` 有副作用，执行前向用户确认。**
+Action Type 查询与执行。**执行有副作用，执行前向用户确认。**
+
+> **注意**：Action 功能通过 `bkn` 子命令提供，没有独立的 `action` 顶层命令。
 
 ## 命令
 
 ```bash
-kweaver action query <kn_id> <action_type_id>
-kweaver action execute <kn_id> [<action_type_id>] [--action-name <name>] [--params '<json>'] [--wait/--no-wait] [--timeout 300]
-kweaver action logs <kn_id> [--limit 20]
-kweaver action log <kn_id> <log_id>
-```
-
-### BKN 层命令（等价）
-
-```bash
 kweaver bkn action-type list <kn_id>
-kweaver bkn action-log list <kn_id> [--offset 0] [--limit 20] [--sort create_time] [--direction desc]
-kweaver bkn action-log get <kn_id> <log_id>
-kweaver bkn action-log cancel <kn_id> <log_id> [--yes/-y]
+kweaver bkn action-type query <kn_id> <at_id>
+kweaver bkn action-type execute <kn_id> <at_id> [<params_json>]
 kweaver bkn action-execution get <kn_id> <execution_id> [--wait/--no-wait] [--timeout 300]
+kweaver bkn action-log list <kn_id> [--offset 0] [--limit 20]
+kweaver bkn action-log get <kn_id> <log_id>
+kweaver bkn action-log cancel <kn_id> <log_id> [-y]
 ```
 
 ## 说明
 
-- `execute` 支持按名称查找 action：`--action-name "sync_data"` 会自动通过 `kn_search` 解析为 ID
-- `--params` 传 JSON 格式执行参数
-- `--wait`（默认 True）会轮询直到执行完成或超时
+- `action-type execute` 触发真实操作，需要用户确认
+- `action-execution get --wait` 轮询直到执行完成或超时
+- `action-log cancel` 取消正在执行的任务
 
 ## 端到端示例
 
 ```bash
 # 查看可用 action
-kweaver bkn action-type list kn-1
+kweaver bkn action-type list <kn_id>
 
-# 按名称执行（自动解析 ID）
-kweaver action execute kn-1 --action-name "sync_inventory" --wait
+# 查看 action 详情
+kweaver bkn action-type query <kn_id> <at_id>
 
-# 带参数执行
-kweaver action execute kn-1 at-123 --params '{"source": "erp", "mode": "incremental"}'
+# 执行 action（带参数）
+kweaver bkn action-type execute <kn_id> <at_id> '{"source": "erp"}'
 
 # 查看执行日志
-kweaver action logs kn-1
-kweaver action log kn-1 log-456
+kweaver bkn action-log list <kn_id>
+kweaver bkn action-log get <kn_id> <log_id>
 ```
