@@ -7,6 +7,7 @@
 ---
 
 ## 1. 错误响应格式不统一
+**涉及模块**: ontology-manager, data-connection, agent-retrieval(MCP), 全平台
 
 ### 现象
 
@@ -73,6 +74,7 @@ curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/
 ---
 
 ## 2. List 响应信封不统一
+**涉及模块**: ontology-manager, ontology-query, data-connection, mdl-data-model, agent-factory, agent-app, 全平台
 
 ### 现象
 
@@ -143,6 +145,7 @@ import sys, json; d=json.load(sys.stdin); print('keys:', list(d.keys()) if isins
 ---
 
 ## 3. Create 接口不支持幂等
+**涉及模块**: ontology-manager, data-connection, mdl-data-model
 
 ### 现象
 
@@ -237,6 +240,7 @@ SDK 直接 `get(existing_id)` 即可，不需要 list + 遍历。
 ---
 
 ## 4. Object Type 创建的 data_properties 隐式必填
+**涉及模块**: ontology-manager (create OT + build engine)
 
 ### 现象
 
@@ -320,6 +324,7 @@ Create OT 时，如果 `data_properties` 未传或缺少 `mapped_field`：
 ---
 
 ## 5. OAuth2 标准流程签发的 Token 被 API 网关拒绝
+**涉及模块**: API Gateway (dip-hub), Ory Hydra 集成层
 
 ### 现象
 
@@ -410,6 +415,56 @@ API 网关的 token 校验应走标准 Ory token introspection（`POST /oauth2/i
 
 ---
 
+## 6. agent-factory 的 Content-Type 处理 Bug
+**涉及模块**: agent-factory
+
+### 现象
+
+`POST /api/agent-factory/v3/published/agent` 端点在 `Content-Type: application/json` 时返回空结果，`Content-Type: text/plain` 时正常返回。SDK 被迫在发送 JSON body 的同时"谎称" Content-Type 为 text/plain：
+
+```python
+# agents.py:48-53 — 实际代码
+# The agent-factory API requires text/plain content-type for this
+# endpoint (application/json returns empty results — platform quirk).
+data = self._http.post(
+    "/api/agent-factory/v3/published/agent",
+    json=body,
+    headers={"content-type": "text/plain;charset=UTF-8"},
+)
+```
+
+### 复现
+
+```bash
+# 步骤 1：用标准 Content-Type 请求（返回空）
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"offset":0,"limit":10,"name":"","category_id":"","custom_space_id":"","is_to_square":1}' \
+  "$BASE/api/agent-factory/v3/published/agent"
+# 预期：返回空列表或空响应
+
+# 步骤 2：用 text/plain Content-Type 请求（返回正常）
+curl -s -X POST -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: text/plain;charset=UTF-8" \
+  -d '{"offset":0,"limit":10,"name":"","category_id":"","custom_space_id":"","is_to_square":1}' \
+  "$BASE/api/agent-factory/v3/published/agent"
+# 预期：返回 agent 列表
+```
+
+**预期差异**：两个请求 body 完全相同，仅 Content-Type 不同。`application/json` 返回空，`text/plain` 返回数据。
+
+### 核心问题
+
+- 请求 body 是合法 JSON，但服务端按 Content-Type header 做了错误的路由或解析
+- 违反 HTTP 语义 — 客户端被迫发送格式不匹配的 Content-Type
+- SDK 的 `HttpClient` 默认在 `json=body` 时设置 `Content-Type: application/json`，必须手动覆盖
+
+### 建议
+
+修复 agent-factory 的请求解析逻辑，使 `Content-Type: application/json` 时正常处理 JSON body。
+
+---
+
 ## 代码引用索引
 
 | 问题 | 关键代码位置 |
@@ -419,3 +474,4 @@ API 网关的 token 校验应走标准 Ory token introspection（`POST /oauth2/i
 | #3 幂等 | `knowledge_networks.py:39`、`object_types.py:79`（双语）、`datasources.py:90`（仅中文）、`dataviews.py:110`（UUID 重试） |
 | #4 data_properties | `object_types.py:50`（注释）、`object_types.py:62`（`except Exception: pass`）、`object_types.py:126-145`（18 条 TYPE_MAP） |
 | #5 OAuth2 token | `_auth.py:86-88`（cookie 路径）、`_auth.py:402-414`（标准 OAuth2 路径） |
+| #6 Content-Type | `agents.py:48-53`（text/plain workaround） |
