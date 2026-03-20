@@ -21,10 +21,9 @@ export class KnowledgeNetworksResource {
 
   async list(opts: { offset?: number; limit?: number; name_pattern?: string; tag?: string } = {}): Promise<unknown[]> {
     const raw = await listKnowledgeNetworks({ ...this.ctx.base(), ...opts });
-    const parsed = JSON.parse(raw) as unknown;
-    const data = parsed && typeof parsed === "object" && "data" in parsed
-      ? (parsed as { data: unknown }).data
-      : parsed;
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    // API returns { entries: [...] }
+    const data = parsed?.entries ?? parsed?.data ?? parsed;
     return Array.isArray(data) ? data : [];
   }
 

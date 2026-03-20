@@ -1,4 +1,13 @@
-import { listAgents } from "../api/agent-list.js";
+import {
+  listAgents,
+  getAgent,
+  getAgentByKey,
+  createAgent,
+  updateAgent,
+  deleteAgent,
+  publishAgent,
+  unpublishAgent,
+} from "../api/agent-list.js";
 import {
   fetchAgentInfo,
   sendChatRequest,
@@ -7,8 +16,85 @@ import {
 import type { ChatResult, SendChatRequestStreamCallbacks } from "../api/agent-chat.js";
 import type { ClientContext } from "../client.js";
 
+// ── Agent config types (mixed: core fields typed, rest open) ─────────────────
+
+export interface AgentLlmConfig {
+  id?: string;
+  name: string;
+  model_type?: string;
+  temperature?: number;
+  top_p?: number;
+  top_k?: number;
+  frequency_penalty?: number;
+  presence_penalty?: number;
+  max_tokens: number;
+}
+
+export interface AgentLlmItem {
+  is_default: boolean;
+  llm_config: AgentLlmConfig;
+}
+
+export interface AgentInputField {
+  name: string;
+  type?: string;
+  desc?: string;
+}
+
+export interface AgentInput {
+  fields: AgentInputField[];
+  rewrite?: Record<string, unknown>;
+  augment?: Record<string, unknown>;
+}
+
+export interface AgentOutput {
+  variables?: Record<string, unknown>;
+  default_format?: string;
+}
+
+export interface AgentConfig {
+  input: AgentInput;
+  output: AgentOutput;
+  system_prompt?: string;
+  dolphin?: string;
+  is_dolphin_mode?: number;
+  data_source?: Record<string, unknown>;
+  skills?: Record<string, unknown>;
+  llms?: AgentLlmItem[];
+  opening_remark_config?: Record<string, unknown>;
+  preset_questions?: Array<{ question: string }>;
+  memory?: { is_enabled: boolean };
+  related_question?: { is_enabled: boolean };
+  plan_mode?: { is_enabled: boolean };
+  conversation_history_config?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface CreateAgentBody {
+  name: string;
+  profile: string;
+  avatar_type?: number;
+  avatar?: string;
+  product_key?: string;
+  key?: string;
+  config: AgentConfig;
+}
+
+export interface UpdateAgentBody {
+  name: string;
+  profile: string;
+  avatar_type: number;
+  avatar: string;
+  product_key: string;
+  config: AgentConfig;
+}
+
+// ── AgentsResource ───────────────────────────────────────────────────────────
+
 export class AgentsResource {
   constructor(private readonly ctx: ClientContext) {}
+
+  // ── List (published agents) ──────────────────────────────────────────────
 
   async list(opts: { name?: string; keyword?: string; offset?: number; limit?: number } = {}): Promise<unknown[]> {
     const { keyword, ...rest } = opts;
@@ -23,16 +109,69 @@ export class AgentsResource {
     return items;
   }
 
-  /** Resolve agent key and version for a given agent id. */
+  // ── Get by ID ────────────────────────────────────────────────────────────
+
+  async get(agentId: string): Promise<unknown> {
+    const raw = await getAgent({ ...this.ctx.base(), agentId });
+    return JSON.parse(raw) as unknown;
+  }
+
+  // ── Get by key ───────────────────────────────────────────────────────────
+
+  async getByKey(key: string): Promise<unknown> {
+    const raw = await getAgentByKey({ ...this.ctx.base(), key });
+    return JSON.parse(raw) as unknown;
+  }
+
+  // ── Create ───────────────────────────────────────────────────────────────
+
+  async create(body: CreateAgentBody): Promise<{ id: string; version: string }> {
+    // Apply defaults for required fields the user may omit
+    const payload = {
+      avatar_type: body.avatar_type ?? 1,
+      avatar: body.avatar ?? "icon-dip-agent-default",
+      product_key: body.product_key ?? "DIP",
+      ...body,
+    };
+    const raw = await createAgent({ ...this.ctx.base(), body: JSON.stringify(payload) });
+    return JSON.parse(raw) as { id: string; version: string };
+  }
+
+  // ── Update ───────────────────────────────────────────────────────────────
+
+  async update(agentId: string, body: UpdateAgentBody): Promise<void> {
+    await updateAgent({ ...this.ctx.base(), agentId, body: JSON.stringify(body) });
+  }
+
+  // ── Delete ───────────────────────────────────────────────────────────────
+
+  async delete(agentId: string): Promise<void> {
+    await deleteAgent({ ...this.ctx.base(), agentId });
+  }
+
+  // ── Publish ──────────────────────────────────────────────────────────────
+
+  async publish(agentId: string, opts: { business_domain_id?: string } = {}): Promise<unknown> {
+    const body = JSON.stringify({ agent_id: agentId, ...opts });
+    const raw = await publishAgent({ ...this.ctx.base(), agentId, body });
+    return JSON.parse(raw) as unknown;
+  }
+
+  // ── Unpublish ────────────────────────────────────────────────────────────
+
+  async unpublish(agentId: string): Promise<void> {
+    await unpublishAgent({ ...this.ctx.base(), agentId });
+  }
+
+  // ── Agent info (resolve key/version) ─────────────────────────────────────
+
   async info(agentId: string, version = "v0"): Promise<{ id: string; key: string; version: string }> {
     const info = await fetchAgentInfo({ ...this.ctx.base(), agentId, version });
     return info;
   }
 
-  /**
-   * Send a single message and return the full response.
-   * Automatically resolves the agent key/version before sending.
-   */
+  // ── Chat (single-shot) ──────────────────────────────────────────────────
+
   async chat(
     agentId: string,
     message: string,
@@ -57,10 +196,8 @@ export class AgentsResource {
     });
   }
 
-  /**
-   * Send a message with streaming callbacks.
-   * Automatically resolves the agent key/version before sending.
-   */
+  // ── Stream ──────────────────────────────────────────────────────────────
+
   async stream(
     agentId: string,
     message: string,

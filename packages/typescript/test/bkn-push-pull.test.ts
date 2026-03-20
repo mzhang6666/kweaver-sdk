@@ -4,8 +4,8 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, writeFileSync } fro
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
-/** Shared BKN examples at repo root (bkn-examples/). Resolved from packages/typescript. */
-const FIXTURES_ROOT = resolve(process.cwd(), "..", "..", "bkn-examples");
+/** Shared BKN examples at repo root (examples/bkn/). Resolved from packages/typescript. */
+const FIXTURES_ROOT = resolve(process.cwd(), "..", "..", "examples", "bkn");
 
 import {
   parseKnPushArgs,

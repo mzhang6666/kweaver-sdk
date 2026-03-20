@@ -12,5 +12,5 @@ Source: `adp/docs/design/bkn/features/bkn_docs/examples/`
 
 ## Usage
 
-- **TypeScript** (`packages/typescript`): `resolve(process.cwd(), "..", "..", "bkn-examples")`
-- **Python** (`packages/python`): `Path(__file__).resolve().parents[2] / "bkn-examples"` or equivalent
+- **TypeScript** (`packages/typescript`): `resolve(process.cwd(), "..", "..", "examples", "bkn")`
+- **Python** (`packages/python`): `Path(__file__).resolve().parents[2] / "examples" / "bkn"` or equivalent

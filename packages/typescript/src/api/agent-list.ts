@@ -1,5 +1,18 @@
 import { HttpError } from "../utils/http.js";
 
+function buildHeaders(accessToken: string, businessDomain: string): Record<string, string> {
+  return {
+    accept: "application/json, text/plain, */*",
+    "accept-language": "zh-CN",
+    authorization: `Bearer ${accessToken}`,
+    token: accessToken,
+    "x-business-domain": businessDomain,
+    "x-language": "zh-CN",
+  };
+}
+
+// ── List published agents ────────────────────────────────────────────────────
+
 export interface ListAgentsOptions {
   baseUrl: string;
   accessToken: string;
@@ -39,14 +52,7 @@ export async function listAgents(options: ListAgentsOptions): Promise<string> {
 
   const response = await fetch(url, {
     method: "POST",
-    headers: {
-      accept: "application/json, text/plain, */*",
-      "accept-language": "zh-CN",
-      authorization: `Bearer ${accessToken}`,
-      token: accessToken,
-      "x-business-domain": businessDomain,
-      "x-language": "zh-CN",
-    },
+    headers: buildHeaders(accessToken, businessDomain),
     body,
   });
 
@@ -56,6 +62,8 @@ export async function listAgents(options: ListAgentsOptions): Promise<string> {
   }
   return responseBody;
 }
+
+// ── Get agent by ID ──────────────────────────────────────────────────────────
 
 export interface GetAgentOptions {
   baseUrl: string;
@@ -77,14 +85,7 @@ export async function getAgent(options: GetAgentOptions): Promise<string> {
 
   const response = await fetch(url, {
     method: "GET",
-    headers: {
-      accept: "application/json, text/plain, */*",
-      "accept-language": "zh-CN",
-      authorization: `Bearer ${accessToken}`,
-      token: accessToken,
-      "x-business-domain": businessDomain,
-      "x-language": "zh-CN",
-    },
+    headers: buildHeaders(accessToken, businessDomain),
   });
 
   const responseBody = await response.text();
@@ -92,4 +93,210 @@ export async function getAgent(options: GetAgentOptions): Promise<string> {
     throw new HttpError(response.status, response.statusText, responseBody);
   }
   return responseBody;
+}
+
+// ── Get agent by key ─────────────────────────────────────────────────────────
+
+export interface GetAgentByKeyOptions {
+  baseUrl: string;
+  accessToken: string;
+  key: string;
+  businessDomain?: string;
+}
+
+export async function getAgentByKey(options: GetAgentByKeyOptions): Promise<string> {
+  const {
+    baseUrl,
+    accessToken,
+    key,
+    businessDomain = "bd_public",
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}/api/agent-factory/v3/agent/by-key/${encodeURIComponent(key)}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const responseBody = await response.text();
+  if (!response.ok) {
+    throw new HttpError(response.status, response.statusText, responseBody);
+  }
+  return responseBody;
+}
+
+// ── Create agent ─────────────────────────────────────────────────────────────
+
+export interface CreateAgentOptions {
+  baseUrl: string;
+  accessToken: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function createAgent(options: CreateAgentOptions): Promise<string> {
+  const {
+    baseUrl,
+    accessToken,
+    body,
+    businessDomain = "bd_public",
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}/api/agent-factory/v3/agent`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      ...buildHeaders(accessToken, businessDomain),
+      "content-type": "application/json",
+    },
+    body,
+  });
+
+  const responseBody = await response.text();
+  if (!response.ok) {
+    throw new HttpError(response.status, response.statusText, responseBody);
+  }
+  return responseBody;
+}
+
+// ── Update agent ─────────────────────────────────────────────────────────────
+
+export interface UpdateAgentOptions {
+  baseUrl: string;
+  accessToken: string;
+  agentId: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function updateAgent(options: UpdateAgentOptions): Promise<string> {
+  const {
+    baseUrl,
+    accessToken,
+    agentId,
+    body,
+    businessDomain = "bd_public",
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}/api/agent-factory/v3/agent/${encodeURIComponent(agentId)}`;
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: {
+      ...buildHeaders(accessToken, businessDomain),
+      "content-type": "application/json",
+    },
+    body,
+  });
+
+  const responseBody = await response.text();
+  if (!response.ok) {
+    throw new HttpError(response.status, response.statusText, responseBody);
+  }
+  return responseBody;
+}
+
+// ── Delete agent ─────────────────────────────────────────────────────────────
+
+export interface DeleteAgentOptions {
+  baseUrl: string;
+  accessToken: string;
+  agentId: string;
+  businessDomain?: string;
+}
+
+export async function deleteAgent(options: DeleteAgentOptions): Promise<void> {
+  const {
+    baseUrl,
+    accessToken,
+    agentId,
+    businessDomain = "bd_public",
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}/api/agent-factory/v3/agent/${encodeURIComponent(agentId)}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+    throw new HttpError(response.status, response.statusText, responseBody);
+  }
+}
+
+// ── Publish agent ────────────────────────────────────────────────────────────
+
+export interface PublishAgentOptions {
+  baseUrl: string;
+  accessToken: string;
+  agentId: string;
+  body?: string;
+  businessDomain?: string;
+}
+
+export async function publishAgent(options: PublishAgentOptions): Promise<string> {
+  const {
+    baseUrl,
+    accessToken,
+    agentId,
+    body = "{}",
+    businessDomain = "bd_public",
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}/api/agent-factory/v3/agent/${encodeURIComponent(agentId)}/publish`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      ...buildHeaders(accessToken, businessDomain),
+      "content-type": "application/json",
+    },
+    body,
+  });
+
+  const responseBody = await response.text();
+  if (!response.ok) {
+    throw new HttpError(response.status, response.statusText, responseBody);
+  }
+  return responseBody;
+}
+
+// ── Unpublish agent ──────────────────────────────────────────────────────────
+
+export interface UnpublishAgentOptions {
+  baseUrl: string;
+  accessToken: string;
+  agentId: string;
+  businessDomain?: string;
+}
+
+export async function unpublishAgent(options: UnpublishAgentOptions): Promise<void> {
+  const {
+    baseUrl,
+    accessToken,
+    agentId,
+    businessDomain = "bd_public",
+  } = options;
+
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}/api/agent-factory/v3/agent/${encodeURIComponent(agentId)}/unpublish`;
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  if (!response.ok) {
+    const responseBody = await response.text();
+    throw new HttpError(response.status, response.statusText, responseBody);
+  }
 }
