@@ -494,3 +494,27 @@ def test_connector_type_get():
     assert isinstance(result, VegaConnectorType)
     assert result.name == "MySQL"
     assert result.enabled is True
+
+
+# -- KWeaverClient.vega property tests ---------------------------------------
+
+from kweaver import KWeaverClient
+
+def test_client_vega_property():
+    """client.vega should return VegaNamespace when vega_url is set."""
+    def handler(req):
+        return httpx.Response(200, json={"entries": []})
+    transport = httpx.MockTransport(handler)
+    client = KWeaverClient(base_url="https://mock", token="tok", transport=transport, vega_url="http://vega:13014")
+    from kweaver.resources.vega import VegaNamespace
+    assert isinstance(client.vega, VegaNamespace)
+
+def test_client_vega_raises_without_url():
+    """client.vega should raise ValueError when vega_url not configured."""
+    def handler(req):
+        return httpx.Response(200, json={})
+    transport = httpx.MockTransport(handler)
+    client = KWeaverClient(base_url="https://mock", token="tok", transport=transport)
+    import pytest
+    with pytest.raises(ValueError, match="vega_url"):
+        _ = client.vega

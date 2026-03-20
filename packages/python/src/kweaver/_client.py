@@ -22,6 +22,7 @@ from kweaver.resources.action_types import ActionTypesResource
 from kweaver.resources.query import QueryResource
 from kweaver.resources.jobs import JobsResource
 from kweaver.resources.relation_types import RelationTypesResource
+from kweaver.resources.vega import VegaNamespace
 
 
 class KWeaverClient:
@@ -45,6 +46,7 @@ class KWeaverClient:
         log_requests: bool = False,
         debug: bool = False,
         dry_run: bool = False,
+        vega_url: str | None = None,
     ) -> None:
         if auth is None:
             if token is None:
@@ -78,6 +80,15 @@ class KWeaverClient:
             middlewares=middlewares,
         )
 
+        # Store for lazy vega namespace creation
+        self._vega_url = vega_url
+        self._vega: VegaNamespace | None = None
+        self._auth_provider = auth
+        self._middlewares = middlewares
+        self._transport = transport
+        self._timeout = timeout
+        self._log_requests = log_requests or debug
+
         self.datasources = DataSourcesResource(self._http)
         self.dataviews = DataViewsResource(self._http)
         self.knowledge_networks = KnowledgeNetworksResource(self._http)
@@ -89,6 +100,29 @@ class KWeaverClient:
         self.action_types = ActionTypesResource(self._http)
         self.jobs = JobsResource(self._http)
         self.concept_groups = ConceptGroupsResource(self._http)
+
+    @property
+    def vega(self) -> VegaNamespace:
+        """Lazily create and return a VegaNamespace instance.
+
+        Raises ValueError if vega_url was not configured.
+        """
+        if self._vega_url is None:
+            raise ValueError(
+                "vega_url is required to use the vega namespace. "
+                "Pass vega_url=... to KWeaverClient."
+            )
+        if self._vega is None:
+            vega_http = HttpClient(
+                base_url=self._vega_url,
+                auth=self._auth_provider,
+                timeout=self._timeout,
+                transport=self._transport,
+                log_requests=self._log_requests,
+                middlewares=self._middlewares,
+            )
+            self._vega = VegaNamespace(vega_http)
+        return self._vega
 
     def close(self) -> None:
         self._http.close()
