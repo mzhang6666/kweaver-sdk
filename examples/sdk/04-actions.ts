@@ -8,7 +8,7 @@
 import { createClient, findKnWithData, pp } from "./setup.js";
 
 async function main() {
-  const client = createClient();
+  const client = await createClient();
   const { knId, knName } = await findKnWithData(client);
   console.log(`Using BKN: ${knName} (${knId})\n`);
 
@@ -28,29 +28,38 @@ async function main() {
   // 2. Query an action type to see its schema/parameters
   const at = ats[0];
   console.log(`\n=== Action Detail: "${at.name}" ===`);
-  const actionDetail = await client.bkn.queryAction(knId, at.id!, {});
-  pp(actionDetail);
+  try {
+    const actionDetail = await client.bkn.queryAction(knId, at.id!, {});
+    pp(actionDetail);
+  } catch (e) {
+    console.log(`  (query failed — action's backing datasource may be unavailable: ${(e as Error).message})`);
+  }
 
   // 3. List action execution logs (historical runs)
   console.log("\n=== Action Logs ===");
-  const logs = await client.bkn.listActionLogs(knId, { atId: at.id, limit: 5 });
-  console.log(`Found ${logs.length} log(s) for "${at.name}":`);
-  for (const log of logs as Array<{ id?: string; status?: string; created_at?: string }>) {
-    console.log(`  [${log.status}] ${log.id} — ${log.created_at ?? ""}`);
-  }
-
-  // 4. Get detail of the most recent log (if any)
-  if (logs.length > 0) {
-    const firstLog = logs[0] as { id?: string };
-    if (firstLog.id) {
-      console.log(`\n=== Log Detail: ${firstLog.id} ===`);
-      const detail = await client.bkn.getActionLog(knId, firstLog.id);
-      pp(detail);
+  try {
+    const logs = await client.bkn.listActionLogs(knId, { atId: at.id, limit: 5 });
+    console.log(`Found ${logs.length} log(s) for "${at.name}":`);
+    for (const log of logs as Array<{ id?: string; status?: string; created_at?: string }>) {
+      console.log(`  [${log.status}] ${log.id} — ${log.created_at ?? ""}`);
     }
+
+    // 4. Get detail of the most recent log (if any)
+    if (logs.length > 0) {
+      const firstLog = logs[0] as { id?: string };
+      if (firstLog.id) {
+        console.log(`\n=== Log Detail: ${firstLog.id} ===`);
+        const detail = await client.bkn.getActionLog(knId, firstLog.id);
+        pp(detail);
+      }
+    }
+  } catch (e) {
+    console.log(`  (logs unavailable — execution index may not exist yet: ${(e as Error).message})`);
   }
 
-  // Note: To actually execute an action, uncomment below.
-  // This is a write operation — it will trigger real side effects.
+  // =====================================================================
+  // UNCOMMENT BELOW TO EXECUTE (WRITE OPERATION — triggers real side effects)
+  // =====================================================================
   //
   // const execution = await client.bkn.executeAction(knId, at.id!, { params: {} });
   // console.log("Execution started:", execution);

@@ -16,7 +16,7 @@ End-to-end TypeScript scripts demonstrating the full SDK capabilities, running a
 ### Prerequisites
 
 - Node.js 22+
-- `npm install` (from the repo root)
+- `cd packages/typescript && npm install`
 - `npx tsx packages/typescript/src/cli.ts auth login <your-platform-url>`
 - A KWeaver instance with at least one BKN containing data (for examples 01-05)
 

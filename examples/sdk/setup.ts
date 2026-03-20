@@ -3,9 +3,19 @@ import { KWeaverClient } from "../../packages/typescript/src/index.js";
 
 /**
  * Initialize a KWeaverClient from ~/.kweaver/ credentials.
+ * Uses `connect()` which auto-refreshes expired tokens.
+ * Run `npx tsx packages/typescript/src/cli.ts auth login <url>` first to set up credentials.
  */
-export function createClient(): KWeaverClient {
-  return new KWeaverClient();
+export async function createClient(): Promise<KWeaverClient> {
+  try {
+    return await KWeaverClient.connect();
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg.includes("baseUrl") || msg.includes("accessToken") || msg.includes("platform")) {
+      console.error("Auth not configured. Run:\n  npx tsx packages/typescript/src/cli.ts auth login <your-platform-url>");
+    }
+    throw e;
+  }
 }
 
 /**

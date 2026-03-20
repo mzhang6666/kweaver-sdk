@@ -88,9 +88,27 @@ export {
   extractText,
 } from "./api/agent-chat.js";
 
-// ── Agent list ────────────────────────────────────────────────────────────────
-export type { ListAgentsOptions } from "./api/agent-list.js";
-export { listAgents } from "./api/agent-list.js";
+// ── Agent list / CRUD ────────────────────────────────────────────────────────
+export type {
+  ListAgentsOptions,
+  GetAgentOptions,
+  GetAgentByKeyOptions,
+  CreateAgentOptions,
+  UpdateAgentOptions,
+  DeleteAgentOptions,
+  PublishAgentOptions,
+  UnpublishAgentOptions,
+} from "./api/agent-list.js";
+export {
+  listAgents,
+  getAgent,
+  getAgentByKey,
+  createAgent,
+  updateAgent,
+  deleteAgent,
+  publishAgent,
+  unpublishAgent,
+} from "./api/agent-list.js";
 
 // ── Conversations ─────────────────────────────────────────────────────────────
 export type { ListConversationsOptions, ListMessagesOptions } from "./api/conversations.js";
@@ -135,6 +153,16 @@ export type { KWeaverClientOptions, ClientContext } from "./client.js";
 export { KWeaverClient } from "./client.js";
 export { KnowledgeNetworksResource } from "./resources/knowledge-networks.js";
 export { AgentsResource } from "./resources/agents.js";
+export type {
+  AgentConfig,
+  AgentInput,
+  AgentInputField,
+  AgentOutput,
+  AgentLlmConfig,
+  AgentLlmItem,
+  CreateAgentBody,
+  UpdateAgentBody,
+} from "./resources/agents.js";
 export { BknResource } from "./resources/bkn.js";
 export { ConversationsResource } from "./resources/conversations.js";
 export { ContextLoaderResource } from "./resources/context-loader.js";

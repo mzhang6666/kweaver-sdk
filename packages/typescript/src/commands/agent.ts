@@ -1,6 +1,10 @@
 import { ensureValidToken, formatHttpError } from "../auth/oauth.js";
 import { runAgentChatCommand } from "./agent-chat.js";
-import { listAgents, getAgent } from "../api/agent-list.js";
+import {
+  listAgents, getAgent, getAgentByKey,
+  createAgent, updateAgent, deleteAgent,
+  publishAgent, unpublishAgent,
+} from "../api/agent-list.js";
 import { listConversations, listMessages } from "../api/conversations.js";
 import { formatCallOutput } from "./call.js";
 
@@ -291,22 +295,20 @@ export function runAgentCommand(args: string[]): Promise<number> {
     console.log(`kweaver agent
 
 Subcommands:
+  list [options]                     List published agents
+  get <agent_id> [--verbose]         Get agent details
+  get-by-key <key>                   Get agent by key
+  create --name <n> --profile <p>    Create a new agent
+       [--key <key>] [--product-key <pk>] [--system-prompt <sp>]
+       [--llm-id <id>] [--llm-max-tokens <n>]
+  update <agent_id> --name <n> ...   Update an existing agent
+  delete <agent_id> [-y]             Delete an agent
+  publish <agent_id>                 Publish an agent
+  unpublish <agent_id>               Unpublish an agent
   chat <agent_id>                    Start interactive chat with an agent
   chat <agent_id> -m "message"       Send a single message (non-interactive)
-       [--conversation-id id]         Continue an existing conversation
-       [-cid id]                      Short alias for --conversation-id
-       [--session-id id]             Alias for --conversation-id
-       [-conversation_id id]         Compatibility alias for reference examples
-       [--version value]             Resolve agent key from a specific version (default: v0)
-       [--stream] [--no-stream]      Enable or disable streaming (default: stream in interactive, no-stream in -m mode)
-       [--verbose]                   Print request details to stderr
-       [-bd|--biz-domain value]      Override x-business-domain (default: bd_public)
-  list [options]                    List published agents
-  get <agent_id> [--verbose]         Get agent details
   sessions <agent_id>                List all conversations for an agent
-       [--limit n] [-bd domain] [--pretty]
-  history <conversation_id>          Show message history for a conversation
-       [--limit n] [-bd domain] [--pretty]`);
+  history <conversation_id>          Show message history for a conversation`);
     return Promise.resolve(0);
   }
 
@@ -402,6 +404,30 @@ Options:
       return Promise.resolve(0);
     }
     return runAgentHistoryCommand(rest);
+  }
+
+  if (subcommand === "get-by-key") {
+    return runAgentGetByKeyCommand(rest);
+  }
+
+  if (subcommand === "create") {
+    return runAgentCreateCommand(rest);
+  }
+
+  if (subcommand === "update") {
+    return runAgentUpdateCommand(rest);
+  }
+
+  if (subcommand === "delete") {
+    return runAgentDeleteCommand(rest);
+  }
+
+  if (subcommand === "publish") {
+    return runAgentPublishCommand(rest);
+  }
+
+  if (subcommand === "unpublish") {
+    return runAgentUnpublishCommand(rest);
   }
 
   console.error(`Unknown agent subcommand: ${subcommand}`);
@@ -631,6 +657,247 @@ Options:
       limit: options.limit,
     });
     console.log(formatCallOutput(body, options.pretty));
+    return 0;
+  } catch (error) {
+    console.error(formatHttpError(error));
+    return 1;
+  }
+}
+
+// ── Get by key ───────────────────────────────────────────────────────────────
+
+async function runAgentGetByKeyCommand(args: string[]): Promise<number> {
+  const key = args[0];
+  if (!key || key.startsWith("-")) {
+    console.error("Usage: kweaver agent get-by-key <key>");
+    return 1;
+  }
+  try {
+    const token = await ensureValidToken();
+    const body = await getAgentByKey({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      key,
+    });
+    console.log(formatCallOutput(body, true));
+    return 0;
+  } catch (error) {
+    console.error(formatHttpError(error));
+    return 1;
+  }
+}
+
+// ── Create ───────────────────────────────────────────────────────────────────
+
+async function runAgentCreateCommand(args: string[]): Promise<number> {
+  let name = "";
+  let profile = "";
+  let key = "";
+  let productKey = "DIP";
+  let systemPrompt = "";
+  let llmId = "";
+  let llmMaxTokens = 4096;
+  let businessDomain = "bd_public";
+
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--help" || arg === "-h") {
+      console.log(`kweaver agent create --name <name> --profile <profile> [options]
+
+Create a new agent.
+
+Required:
+  --name <text>            Agent name (max 50)
+  --profile <text>         Agent description (max 500)
+
+Optional:
+  --key <text>             Agent unique key (auto-generated if omitted)
+  --product-key <text>     Product key: DIP, AnyShare, ChatBI (default: DIP)
+  --system-prompt <text>   System prompt
+  --llm-id <id>            LLM model ID (required for public API)
+  --llm-max-tokens <n>     LLM max tokens (default: 4096)
+  -bd, --biz-domain <val>  Business domain (default: bd_public)`);
+      return 0;
+    }
+    if (arg === "--name") { name = args[++i] ?? ""; continue; }
+    if (arg === "--profile") { profile = args[++i] ?? ""; continue; }
+    if (arg === "--key") { key = args[++i] ?? ""; continue; }
+    if (arg === "--product-key") { productKey = args[++i] ?? "DIP"; continue; }
+    if (arg === "--system-prompt") { systemPrompt = args[++i] ?? ""; continue; }
+    if (arg === "--llm-id") { llmId = args[++i] ?? ""; continue; }
+    if (arg === "--llm-max-tokens") { llmMaxTokens = parseInt(args[++i] ?? "4096", 10); continue; }
+    if (arg === "-bd" || arg === "--biz-domain") { businessDomain = args[++i] ?? "bd_public"; continue; }
+  }
+
+  if (!name) { console.error("--name is required"); return 1; }
+  if (!profile) { console.error("--profile is required"); return 1; }
+
+  const config: Record<string, unknown> = {
+    input: { fields: [{ name: "user_input", type: "string", desc: "" }] },
+    output: { default_format: "markdown" },
+    system_prompt: systemPrompt,
+  };
+  if (llmId) {
+    config.llms = [{ is_default: true, llm_config: { id: llmId, name: llmId, max_tokens: llmMaxTokens } }];
+  }
+
+  const payload: Record<string, unknown> = {
+    name,
+    profile,
+    avatar_type: 1,
+    avatar: "icon-dip-agent-default",
+    product_key: productKey,
+    config,
+  };
+  if (key) payload.key = key;
+
+  try {
+    const token = await ensureValidToken();
+    const body = await createAgent({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      businessDomain,
+      body: JSON.stringify(payload),
+    });
+    console.log(body);
+    return 0;
+  } catch (error) {
+    console.error(formatHttpError(error));
+    return 1;
+  }
+}
+
+// ── Update ───────────────────────────────────────────────────────────────────
+
+async function runAgentUpdateCommand(args: string[]): Promise<number> {
+  const agentId = args[0];
+  if (!agentId || agentId.startsWith("-")) {
+    console.error("Usage: kweaver agent update <agent_id> [--name <n>] [--profile <p>] [--system-prompt <sp>]");
+    return 1;
+  }
+
+  try {
+    const token = await ensureValidToken();
+    const currentRaw = await getAgent({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      agentId,
+    });
+    const current = JSON.parse(currentRaw) as Record<string, unknown>;
+
+    for (let i = 1; i < args.length; i += 1) {
+      const arg = args[i];
+      if (arg === "--name") { current.name = args[++i] ?? current.name; continue; }
+      if (arg === "--profile") { current.profile = args[++i] ?? current.profile; continue; }
+      if (arg === "--system-prompt") {
+        const config = (current.config ?? {}) as Record<string, unknown>;
+        config.system_prompt = args[++i] ?? "";
+        current.config = config;
+        continue;
+      }
+    }
+
+    const body = await updateAgent({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      agentId,
+      body: JSON.stringify({
+        name: current.name,
+        profile: current.profile,
+        avatar_type: current.avatar_type,
+        avatar: current.avatar,
+        product_key: current.product_key,
+        config: current.config,
+      }),
+    });
+    if (body) console.log(body);
+    else console.log("Updated.");
+    return 0;
+  } catch (error) {
+    console.error(formatHttpError(error));
+    return 1;
+  }
+}
+
+// ── Delete ───────────────────────────────────────────────────────────────────
+
+async function runAgentDeleteCommand(args: string[]): Promise<number> {
+  const agentId = args[0];
+  if (!agentId || agentId.startsWith("-")) {
+    console.error("Usage: kweaver agent delete <agent_id> [-y]");
+    return 1;
+  }
+
+  const autoConfirm = args.includes("-y") || args.includes("--yes");
+  if (!autoConfirm) {
+    process.stdout.write(`Delete agent ${agentId}? [y/N] `);
+    const answer = await new Promise<string>((resolve) => {
+      process.stdin.setEncoding("utf8");
+      process.stdin.once("data", (data) => resolve(String(data).trim().toLowerCase()));
+    });
+    if (answer !== "y" && answer !== "yes") {
+      console.log("Cancelled.");
+      return 0;
+    }
+  }
+
+  try {
+    const token = await ensureValidToken();
+    await deleteAgent({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      agentId,
+    });
+    console.log(`Deleted agent ${agentId}.`);
+    return 0;
+  } catch (error) {
+    console.error(formatHttpError(error));
+    return 1;
+  }
+}
+
+// ── Publish ──────────────────────────────────────────────────────────────────
+
+async function runAgentPublishCommand(args: string[]): Promise<number> {
+  const agentId = args[0];
+  if (!agentId || agentId.startsWith("-")) {
+    console.error("Usage: kweaver agent publish <agent_id>");
+    return 1;
+  }
+
+  try {
+    const token = await ensureValidToken();
+    const body = await publishAgent({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      agentId,
+      body: JSON.stringify({ agent_id: agentId }),
+    });
+    console.log(body);
+    return 0;
+  } catch (error) {
+    console.error(formatHttpError(error));
+    return 1;
+  }
+}
+
+// ── Unpublish ────────────────────────────────────────────────────────────────
+
+async function runAgentUnpublishCommand(args: string[]): Promise<number> {
+  const agentId = args[0];
+  if (!agentId || agentId.startsWith("-")) {
+    console.error("Usage: kweaver agent unpublish <agent_id>");
+    return 1;
+  }
+
+  try {
+    const token = await ensureValidToken();
+    await unpublishAgent({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      agentId,
+    });
+    console.log(`Unpublished agent ${agentId}.`);
     return 0;
   } catch (error) {
     console.error(formatHttpError(error));

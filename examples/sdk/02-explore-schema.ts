@@ -8,7 +8,7 @@
 import { createClient, findKnWithData, pp } from "./setup.js";
 
 async function main() {
-  const client = createClient();
+  const client = await createClient();
   const { knId, knName } = await findKnWithData(client);
   console.log(`Using BKN: ${knName} (${knId})\n`);
 

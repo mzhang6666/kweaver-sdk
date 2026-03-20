@@ -31,6 +31,7 @@ async function main() {
   const bknId = first.id!;
   console.log(`\nSearching in "${first.name}"...`);
 
+  // "数据" means "data" in Chinese — change this to match your BKN's language
   const result = await kweaver.search("数据", { bknId, maxConcepts: 5 });
   console.log(`\nSearch results (${result.hits_total ?? 0} hits):`);
   for (const concept of result.concepts ?? []) {

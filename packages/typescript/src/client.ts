@@ -1,7 +1,9 @@
 import {
   getCurrentPlatform,
   loadTokenConfig,
+  loadClientConfig,
 } from "./config/store.js";
+import { ensureValidToken } from "./auth/oauth.js";
 import { AgentsResource } from "./resources/agents.js";
 import { ConversationsResource } from "./resources/conversations.js";
 import { ContextLoaderResource } from "./resources/context-loader.js";
@@ -39,6 +41,13 @@ export interface KWeaverClientOptions {
    * Override with KWEAVER_BUSINESS_DOMAIN env var or pass explicitly.
    */
   businessDomain?: string;
+
+  /**
+   * When true, read credentials exclusively from ~/.kweaver/ (saved by
+   * `kweaver auth login`), ignoring KWEAVER_BASE_URL / KWEAVER_TOKEN env vars.
+   * Useful when env vars hold stale tokens or are intended for other tooling.
+   */
+  config?: boolean;
 }
 
 // ── KWeaverClient ─────────────────────────────────────────────────────────────
@@ -89,20 +98,37 @@ export class KWeaverClient implements ClientContext {
   readonly conversations: ConversationsResource;
 
   constructor(opts: KWeaverClientOptions = {}) {
-    const envUrl = process.env.KWEAVER_BASE_URL;
-    const envToken = process.env.KWEAVER_TOKEN;
     const envDomain = process.env.KWEAVER_BUSINESS_DOMAIN;
 
-    // Resolve baseUrl: explicit > env > saved config
-    let baseUrl = opts.baseUrl ?? envUrl;
-    let accessToken = opts.accessToken ?? envToken;
+    let baseUrl: string | undefined;
+    let accessToken: string | undefined;
 
-    if (!baseUrl || !accessToken) {
+    if (opts.config) {
+      // config: true — read exclusively from ~/.kweaver/, ignore env vars
       const platform = getCurrentPlatform();
-      if (platform) {
-        const stored = loadTokenConfig(platform);
-        if (!baseUrl) baseUrl = platform;
-        if (!accessToken && stored) accessToken = stored.accessToken;
+      if (!platform) {
+        throw new Error("No active platform. Run `kweaver auth login` first.");
+      }
+      const stored = loadTokenConfig(platform);
+      if (!stored?.accessToken) {
+        throw new Error(`No token for ${platform}. Run \`kweaver auth login\` first.`);
+      }
+      baseUrl = opts.baseUrl ?? platform;
+      accessToken = opts.accessToken ?? stored.accessToken;
+    } else {
+      // Default: explicit > env > saved config
+      const envUrl = process.env.KWEAVER_BASE_URL;
+      const envToken = process.env.KWEAVER_TOKEN;
+      baseUrl = opts.baseUrl ?? envUrl;
+      accessToken = opts.accessToken ?? envToken;
+
+      if (!baseUrl || !accessToken) {
+        const platform = getCurrentPlatform();
+        if (platform) {
+          const stored = loadTokenConfig(platform);
+          if (!baseUrl) baseUrl = platform;
+          if (!accessToken && stored) accessToken = stored.accessToken;
+        }
       }
     }
 
@@ -120,13 +146,35 @@ export class KWeaverClient implements ClientContext {
     }
 
     this._baseUrl = baseUrl.replace(/\/+$/, "");
-    this._accessToken = accessToken;
+    // Strip "Bearer " prefix if present — callers (env vars, config files) may
+    // include it, but API helpers always add their own "Bearer " prefix.
+    this._accessToken = accessToken.replace(/^Bearer\s+/i, "");
     this._businessDomain = opts.businessDomain ?? envDomain ?? "bd_public";
 
     this.knowledgeNetworks = new KnowledgeNetworksResource(this);
     this.agents = new AgentsResource(this);
     this.bkn = new BknResource(this);
     this.conversations = new ConversationsResource(this);
+  }
+
+  /**
+   * Async factory that auto-refreshes expired tokens.
+   *
+   * Reads credentials from `~/.kweaver/` and refreshes the access token
+   * if it has expired (using the saved refresh token).
+   *
+   * @example
+   * ```typescript
+   * const client = await KWeaverClient.connect();
+   * ```
+   */
+  static async connect(opts: KWeaverClientOptions = {}): Promise<KWeaverClient> {
+    const token = await ensureValidToken();
+    return new KWeaverClient({
+      baseUrl: token.baseUrl,
+      accessToken: token.accessToken,
+      ...opts,
+    });
   }
 
   /** @internal — used by resource classes to build API call options. */

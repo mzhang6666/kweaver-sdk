@@ -75,7 +75,7 @@ async function main() {
 
     // Step 3: Build the knowledge network index
     console.log("=== Step 3: Build BKN ===");
-    const client = createClient();
+    const client = await createClient();
     console.log("Building... (this may take a while)");
     const buildStatus = await client.knowledgeNetworks.buildAndWait(knId, {
       timeout: 300_000,

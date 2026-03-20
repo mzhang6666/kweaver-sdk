@@ -6,16 +6,24 @@
  * Run: npx tsx examples/sdk/05-agent-conversation.ts
  */
 import { createClient, findAgent, pp } from "./setup.js";
+// Monorepo import — published users would use: import type { ProgressItem } from "@kweaver-ai/kweaver-sdk";
 import type { ProgressItem } from "../../packages/typescript/src/index.js";
 
 async function main() {
-  const client = createClient();
+  const client = await createClient();
 
   // 1. List available agents
   const agentList = await client.agents.list({ limit: 10 });
   console.log(`=== Available Agents (${agentList.length}) ===`);
   for (const a of agentList as Array<{ id?: string; name?: string; description?: string }>) {
     console.log(`  ${a.name} (${a.id}) — ${a.description ?? ""}`);
+  }
+
+  if (agentList.length === 0) {
+    console.log("\nNo published agents available.");
+    console.log("Create one via CLI:  npx tsx packages/typescript/src/cli.ts agent create --name test --profile test --llm-id <model-id>");
+    console.log("Then publish it:     npx tsx packages/typescript/src/cli.ts agent publish <agent-id>");
+    return;
   }
 
   const { agentId, agentName } = await findAgent(client);

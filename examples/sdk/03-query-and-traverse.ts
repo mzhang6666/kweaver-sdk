@@ -8,7 +8,7 @@
 import { createClient, findKnWithData, pp } from "./setup.js";
 
 async function main() {
-  const client = createClient();
+  const client = await createClient();
   const { knId, knName } = await findKnWithData(client);
   console.log(`Using BKN: ${knName} (${knId})\n`);
 
@@ -27,15 +27,25 @@ async function main() {
   // 2. Query instances (no filter, just limit)
   const instances = await client.bkn.queryInstances(knId, ot.id!, {
     page: 1,
-    size: 5,
+    limit: 5,
   });
   console.log("\nInstances (first 5):");
   pp(instances);
 
-  // 3. Query properties
-  const properties = await client.bkn.queryProperties(knId, ot.id!, {});
-  console.log("\nProperties:");
-  pp(properties);
+  // 3. Query properties for the first instance (if any)
+  const datas = (instances as { datas?: Array<{ _instance_identity?: Record<string, unknown> }> }).datas;
+  if (datas && datas.length > 0 && datas[0]._instance_identity) {
+    const identity = datas[0]._instance_identity;
+    try {
+      console.log("\nProperties of first instance:");
+      const properties = await client.bkn.queryProperties(knId, ot.id!, { identity });
+      pp(properties);
+    } catch (e) {
+      console.log(`  (skipped — instance has no queryable identity: ${(e as Error).message})`);
+    }
+  } else {
+    console.log("\nNo instances found — skipping property query.");
+  }
 
   // 4. Subgraph traversal (if relation types exist)
   const relationTypes = await client.knowledgeNetworks.listRelationTypes(knId);
@@ -45,21 +55,28 @@ async function main() {
     target_object_type?: { id?: string };
   }>;
 
-  if (rts.length > 0) {
-    const rt = rts[0];
+  // Find a relation type with both source and target object types defined
+  const rt = rts.find(r => r.source_object_type?.id && r.target_object_type?.id);
+  if (rt) {
     console.log(`\n=== Subgraph via "${rt.name}" ===`);
-    const subgraph = await client.bkn.querySubgraph(knId, {
-      relation_type_paths: [{
-        relation_types: [{
-          relation_type_id: rt.id,
-          source_object_type_id: rt.source_object_type?.id,
-          target_object_type_id: rt.target_object_type?.id,
+    try {
+      const subgraph = await client.bkn.querySubgraph(knId, {
+        relation_type_paths: [{
+          relation_types: [{
+            relation_type_id: rt.id,
+            source_object_type_id: rt.source_object_type?.id,
+            target_object_type_id: rt.target_object_type?.id,
+          }],
         }],
-      }],
-      limit: 5,
-    });
-    console.log("Subgraph result:");
-    pp(subgraph);
+        limit: 5,
+      });
+      console.log("Subgraph result:");
+      pp(subgraph);
+    } catch (e) {
+      console.log(`  (subgraph query failed — this BKN may lack linked data: ${(e as Error).message})`);
+    }
+  } else if (rts.length > 0) {
+    console.log("\nRelation types found but none have complete source/target — skipping subgraph.");
   }
 
   // --- Part 2: Context Loader (MCP protocol) ---
@@ -68,25 +85,30 @@ async function main() {
 
   console.log("\n=== Context Loader (MCP) ===");
 
-  // Initialize Context Loader — requires the MCP endpoint URL
-  const baseUrl = (client as unknown as { baseUrl: string }).baseUrl;
+  // Initialize Context Loader — requires the MCP endpoint URL.
+  // You can also get this URL by running: npx tsx packages/typescript/src/cli.ts context-loader config show
+  const { baseUrl } = client.base();
   const mcpUrl = `${baseUrl}/api/agent-retrieval/v1/mcp`;
   const cl = client.contextLoader(mcpUrl, knId);
 
   // Layer 1: Schema search — discover types by natural language
   console.log("Layer 1 — Schema search:");
+  // "数据" means "data" in Chinese — change this to match your BKN's language
   const schemaResults = await cl.schemaSearch({ query: "数据", max_concepts: 5 });
   pp(schemaResults);
 
   // Layer 2: Instance query via MCP (if we found an object type)
   if (ot.id) {
     console.log(`\nLayer 2 — Instance query for "${ot.name}" via MCP:`);
-    const mpcInstances = await cl.queryInstances({
-      ot_id: ot.id,
-      condition: { operation: "and", sub_conditions: [] },
-      limit: 5,
-    });
-    pp(mpcInstances);
+    try {
+      const mcpInstances = await cl.queryInstances({
+        ot_id: ot.id,
+        limit: 5,
+      });
+      pp(mcpInstances);
+    } catch (e) {
+      console.log(`  (MCP instance query failed: ${(e as Error).message})`);
+    }
   }
 }
 
