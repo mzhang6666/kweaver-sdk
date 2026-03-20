@@ -59,7 +59,7 @@ export function parseCallArgs(args: string[]): CallInvocation {
       continue;
     }
 
-    if (arg === "--verbose") {
+    if (arg === "-v" || arg === "--verbose") {
       verbose = true;
       continue;
     }
@@ -146,6 +146,22 @@ export function formatVerboseRequest(invocation: CallInvocation): string[] {
 }
 
 export async function runCallCommand(args: string[]): Promise<number> {
+  if (args.length === 0 || args[0] === "--help" || args[0] === "-h") {
+    console.log(`kweaver call <url> [-X METHOD] [-H "Name: value"] [-d BODY] [--pretty] [--verbose] [-bd value]
+
+Call an API with curl-style flags and auto-injected token headers.
+
+Options:
+  <url>              API path (e.g. /api/ontology-manager/v1/knowledge-networks)
+  -X, --request      HTTP method (default: GET)
+  -H, --header       Extra header (repeatable)
+  -d, --data         JSON request body
+  -bd, --biz-domain  Override x-business-domain (default: bd_public)
+  -v, --verbose      Print request info to stderr
+  --pretty           Pretty-print JSON output (default)`);
+    return 0;
+  }
+
   let invocation: CallInvocation;
   try {
     invocation = parseCallArgs(args);
@@ -156,6 +172,12 @@ export async function runCallCommand(args: string[]): Promise<number> {
 
   try {
     const token = await ensureValidToken();
+
+    // Prepend baseUrl when the URL is a relative path (no scheme)
+    if (invocation.url.startsWith("/")) {
+      invocation.url = token.baseUrl.replace(/\/+$/, "") + invocation.url;
+    }
+
     injectAuthHeaders(invocation.headers, token.accessToken, invocation.businessDomain);
 
     if (invocation.verbose) {

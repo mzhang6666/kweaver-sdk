@@ -158,10 +158,11 @@ export class KWeaverClient implements ClientContext {
   }
 
   /**
-   * Async factory that auto-refreshes expired tokens.
+   * Async factory that auto-refreshes expired or revoked tokens.
    *
    * Reads credentials from `~/.kweaver/` and refreshes the access token
-   * if it has expired (using the saved refresh token).
+   * if it has expired or been revoked (using the saved refresh token).
+   * If the initial token fails with 401, forces a refresh and retries.
    *
    * @example
    * ```typescript
@@ -169,12 +170,39 @@ export class KWeaverClient implements ClientContext {
    * ```
    */
   static async connect(opts: KWeaverClientOptions = {}): Promise<KWeaverClient> {
-    const token = await ensureValidToken();
-    return new KWeaverClient({
+    // Try with current token first
+    let token = await ensureValidToken();
+    const client = new KWeaverClient({
       baseUrl: token.baseUrl,
       accessToken: token.accessToken,
       ...opts,
     });
+
+    // Quick probe — if the token was revoked server-side, force refresh
+    try {
+      const probe = await fetch(
+        `${token.baseUrl.replace(/\/+$/, "")}/api/ontology-manager/v1/knowledge-networks?limit=1`,
+        { headers: { authorization: `Bearer ${token.accessToken}`, token: token.accessToken } },
+      );
+      if (probe.status === 401) {
+        try {
+          token = await ensureValidToken({ forceRefresh: true });
+        } catch {
+          throw new Error(
+            "Access token revoked and refresh token also expired. " +
+            "Run `kweaver auth login` to re-authenticate."
+          );
+        }
+        return new KWeaverClient({
+          baseUrl: token.baseUrl,
+          accessToken: token.accessToken,
+          ...opts,
+        });
+      }
+    } catch {
+      // Network error — return client as-is, let the caller deal with it
+    }
+    return client;
   }
 
   /** @internal — used by resource classes to build API call options. */

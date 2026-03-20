@@ -17,7 +17,6 @@ from typing import Any
 
 import pytest
 
-from click.testing import CliRunner
 
 from kweaver import KWeaverClient, PasswordAuth
 
@@ -266,18 +265,6 @@ def create_knowledge_network(kweaver_client: KWeaverClient):
         except Exception:
             pass
 
-
-@pytest.fixture(scope="session")
-def cli_runner(e2e_env: dict[str, str]) -> CliRunner:
-    """CliRunner with auth env vars set."""
-    env = {}
-    if e2e_env.get("base_url"):
-        env["KWEAVER_BASE_URL"] = e2e_env["base_url"]
-    if e2e_env.get("token"):
-        env["KWEAVER_TOKEN"] = e2e_env["token"]
-    if e2e_env.get("business_domain"):
-        env["KWEAVER_BUSINESS_DOMAIN"] = e2e_env["business_domain"]
-    return CliRunner(env=env)
 
 
 @pytest.fixture(scope="session")

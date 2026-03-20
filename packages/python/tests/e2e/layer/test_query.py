@@ -4,13 +4,10 @@ Read-only tests against existing indexed data.
 """
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from kweaver import KWeaverClient
 from kweaver.types import Condition
-from kweaver.cli.main import cli
 
 pytestmark = pytest.mark.e2e
 
@@ -110,33 +107,3 @@ def test_object_type_properties(kweaver_client: KWeaverClient, kn_with_data):
     )
     assert isinstance(result, dict)
     assert "datas" in result or "data" in result
-
-
-def test_cli_kn_search(kweaver_client: KWeaverClient, kn_with_data, cli_runner):
-    """CLI: query kn-search."""
-    kn = kn_with_data["kn"]
-    ot = kn_with_data["ot"]
-    result = cli_runner.invoke(cli, ["query", "kn-search", kn.id, ot.name])
-    assert result.exit_code == 0, f"kn-search failed: {result.output}"
-    data = json.loads(result.output)
-    assert isinstance(data, dict)
-
-
-def test_cli_object_type_properties(kweaver_client: KWeaverClient, kn_with_data, cli_runner):
-    """CLI: bkn object-type properties."""
-    kn = kn_with_data["kn"]
-    ot = kn_with_data["ot"]
-    instances = kweaver_client.query.instances(kn.id, ot.id, limit=1)
-    if not instances.data:
-        pytest.skip("No instances")
-    identity = instances.data[0].get("_instance_identity")
-    if not identity:
-        pytest.skip("No identity")
-    prop_name = ot.properties[0].name if ot.properties else None
-    if not prop_name:
-        pytest.skip("No properties")
-    body_json = json.dumps({"_instance_identities": [identity], "properties": [prop_name]})
-    result = cli_runner.invoke(cli, ["bkn", "object-type", "properties", kn.id, ot.id, body_json])
-    assert result.exit_code == 0, f"properties failed: {result.output}"
-    data = json.loads(result.output)
-    assert isinstance(data, dict)

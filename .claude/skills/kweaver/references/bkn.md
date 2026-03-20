@@ -1,13 +1,12 @@
 # BKN 命令参考
 
-知识网络管理：schema CRUD、构建、导出、诊断。
+知识网络管理：schema CRUD、构建、导出、推送/拉取。
 
 ## 概览
 
 ```bash
-kweaver bkn                          # KN 概览（= inspect）
 kweaver bkn list                     # 列出知识网络
-kweaver bkn inspect [<kn_id>]        # 一站式诊断
+kweaver bkn get <kn_id> [--stats] [--export]
 ```
 
 ## 知识网络
@@ -17,11 +16,13 @@ kweaver bkn list [--name <n>] [--name-pattern <p>] [--tag <t>] [--sort update_ti
 kweaver bkn get <kn_id> [--stats] [--export]
 kweaver bkn stats <kn_id>
 kweaver bkn export <kn_id>
-kweaver bkn create <datasource_id> --name <name> [--tables <t1,t2>] [--build/--no-build] [--timeout 300]
+kweaver bkn create [options]                         # 创建空知识网络（或 --body-file）
+kweaver bkn create-from-ds <ds_id> --name <name> [--tables <t1,t2>] [--build/--no-build] [--timeout 300]
 kweaver bkn update <kn_id> [--name <n>] [--description <d>] [--tag <t> ...]
 kweaver bkn build <kn_id> [--wait/--no-wait] [--timeout 300]
 kweaver bkn delete <kn_id> [--yes]
-kweaver bkn inspect [<kn_id>] [--full]
+kweaver bkn push <directory> [--branch main]         # 上传 BKN 目录为 tar
+kweaver bkn pull <kn_id> [<directory>] [--branch main]  # 下载 BKN tar 并解压
 ```
 
 ## Object Type
@@ -32,7 +33,8 @@ kweaver bkn object-type get <kn_id> <ot_id>                # -v 显示完整 dat
 kweaver bkn object-type create <kn_id> --name <n> --dataview-id <dv> --primary-key <pk> --display-key <dk> [--property '<json>' ...]
 kweaver bkn object-type update <kn_id> <ot_id> [--name <n>] [--display-key <dk>]
 kweaver bkn object-type delete <kn_id> <ot_ids> [--yes/-y]
-kweaver bkn object-type properties <kn_id> <ot_id> [<body_json>]
+kweaver bkn object-type query <kn_id> <ot_id> ['<json>']   # 查询实例（支持 --limit/--search-after）
+kweaver bkn object-type properties <kn_id> <ot_id> '<json>' # 查询实例属性
 ```
 
 ## Relation Type
@@ -45,37 +47,22 @@ kweaver bkn relation-type update <kn_id> <rt_id> [--name <n>]
 kweaver bkn relation-type delete <kn_id> <rt_ids> [--yes/-y]
 ```
 
-## Concept Group
+## Subgraph
 
 ```bash
-kweaver bkn concept-group list [<kn_id>]
-kweaver bkn concept-group get [<kn_id>] <cg_id>
-kweaver bkn concept-group create [<kn_id>] --name <name>
-kweaver bkn concept-group update [<kn_id>] <cg_id> --name <name>
-kweaver bkn concept-group delete [<kn_id>] <cg_ids> [--yes/-y]
-kweaver bkn concept-group add-members [<kn_id>] <cg_id> <ot_id1,ot_id2>
-kweaver bkn concept-group remove-members [<kn_id>] <cg_id> <ot_id1,ot_id2>
-```
-
-> `[<kn_id>]` 可选：省略时使用 `kweaver use` 设置的上下文。
-
-## Job
-
-```bash
-kweaver bkn job list [<kn_id>] [--status running|completed|failed]
-kweaver bkn job tasks [<kn_id>] <job_id>
-kweaver bkn job delete [<kn_id>] <job_ids> [--yes/-y]
-kweaver bkn job wait [<kn_id>] <job_id> [--timeout 300]
+kweaver bkn subgraph <kn_id> '<json>'   # 子图查询
 ```
 
 ## Action Type / Log / Execution
 
 ```bash
 kweaver bkn action-type list <kn_id>
+kweaver bkn action-type query <kn_id> <at_id> '<json>'
+kweaver bkn action-type execute <kn_id> <at_id> '<json>'   # 有副作用，执行前确认
+kweaver bkn action-execution get <kn_id> <execution_id> [--wait/--no-wait] [--timeout 300]
 kweaver bkn action-log list <kn_id> [--offset 0] [--limit 20] [--sort create_time] [--direction desc]
 kweaver bkn action-log get <kn_id> <log_id>
 kweaver bkn action-log cancel <kn_id> <log_id> [--yes/-y]
-kweaver bkn action-execution get <kn_id> <execution_id> [--wait/--no-wait] [--timeout 300]
 ```
 
 ## 端到端示例
@@ -83,7 +70,7 @@ kweaver bkn action-execution get <kn_id> <execution_id> [--wait/--no-wait] [--ti
 ```bash
 # 接入数据源 → 创建 KN → 查询
 kweaver ds connect mysql db.example.com 3306 erp --account root --password pass
-kweaver bkn create <ds_id> --name "erp-kn" --wait
+kweaver bkn create-from-ds <ds_id> --name "erp-kn" --build
 kweaver bkn object-type list <kn_id>
-kweaver query kn-search <kn_id> "订单"
+kweaver bkn search <kn_id> "订单"
 ```

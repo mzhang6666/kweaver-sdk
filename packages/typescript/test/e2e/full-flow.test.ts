@@ -33,10 +33,11 @@ test("e2e: full lifecycle ds connect -> bkn create-from-ds -> bkn export -> bkn 
   }
   const connectParsed = JSON.parse(connectOut) as Record<string, unknown> | Record<string, unknown>[];
   const dsItem = Array.isArray(connectParsed) ? connectParsed[0] : connectParsed;
-  const dsId = dsItem && typeof dsItem === "object" && ("id" in dsItem || "ds_id" in dsItem)
-    ? String((dsItem as { id?: string; ds_id?: string }).id ?? (dsItem as { ds_id?: string }).ds_id)
-    : null;
-  if (!dsId) {
+  const dsId = dsItem && typeof dsItem === "object"
+    ? String((dsItem as Record<string, unknown>).datasource_id ?? (dsItem as Record<string, unknown>).id ?? (dsItem as Record<string, unknown>).ds_id ?? "")
+    : "";
+
+  if (!dsId || dsId === "undefined") {
     test.skip("no datasource id from connect");
     return;
   }

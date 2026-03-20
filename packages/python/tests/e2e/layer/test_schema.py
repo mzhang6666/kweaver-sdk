@@ -4,12 +4,9 @@ Read-only tests use existing data. Write tests are marked destructive.
 """
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from kweaver import KWeaverClient
-from kweaver.cli.main import cli
 
 pytestmark = pytest.mark.e2e
 
@@ -47,32 +44,3 @@ def test_relation_type_get_if_exists(kweaver_client: KWeaverClient, kn_with_data
     rt = kweaver_client.relation_types.get(kn.id, rts[0].id)
     assert rt.id == rts[0].id
     assert rt.name == rts[0].name
-
-
-def test_cli_object_type_list(kn_with_data, cli_runner):
-    """CLI: bkn object-type list."""
-    kn = kn_with_data["kn"]
-    result = cli_runner.invoke(cli, ["bkn", "object-type", "list", kn.id])
-    assert result.exit_code == 0
-    data = json.loads(result.output)
-    assert isinstance(data, list)
-    assert len(data) > 0
-
-
-def test_cli_object_type_get(kn_with_data, cli_runner):
-    """CLI: bkn object-type get."""
-    kn = kn_with_data["kn"]
-    ot = kn_with_data["ot"]
-    result = cli_runner.invoke(cli, ["bkn", "object-type", "get", kn.id, ot.id])
-    assert result.exit_code == 0
-    data = json.loads(result.output)
-    assert data["id"] == ot.id
-
-
-def test_cli_relation_type_list(kn_with_data, cli_runner):
-    """CLI: bkn relation-type list."""
-    kn = kn_with_data["kn"]
-    result = cli_runner.invoke(cli, ["bkn", "relation-type", "list", kn.id])
-    assert result.exit_code == 0
-    data = json.loads(result.output)
-    assert isinstance(data, list)

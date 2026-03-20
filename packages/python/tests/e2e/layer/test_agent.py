@@ -5,12 +5,9 @@ Tests against the real agent-factory and agent-app services.
 
 from __future__ import annotations
 
-import json
-
 import pytest
 
 from kweaver import KWeaverClient
-from kweaver.cli.main import cli
 
 pytestmark = pytest.mark.e2e
 
@@ -31,10 +28,18 @@ def test_list_agents_published(kweaver_client: KWeaverClient):
 
 @pytest.fixture(scope="module")
 def any_agent(kweaver_client: KWeaverClient):
-    """Find any agent for tests (published or not)."""
+    """Find first agent the current user can access (get without 403)."""
+    from kweaver._errors import AuthorizationError
+
     agents = kweaver_client.agents.list()
     assert agents, "No agents found — cannot proceed"
-    return agents[0]
+    for a in agents:
+        try:
+            kweaver_client.agents.get(a.id)
+            return a
+        except AuthorizationError:
+            continue
+    pytest.skip("No accessible agents (all returned 403)")
 
 
 def test_get_agent(kweaver_client: KWeaverClient, any_agent):
@@ -87,22 +92,3 @@ def test_conversation_flow(kweaver_client: KWeaverClient):
     pytest.fail(
         f"All {len(agents)} published agents failed: {error_details}"
     )
-
-
-def test_cli_agent_get(kweaver_client: KWeaverClient, any_agent, cli_runner):
-    """CLI agent get should return agent details."""
-    result = cli_runner.invoke(cli, ["agent", "get", any_agent.id])
-    assert result.exit_code == 0, f"agent get failed: {result.output}"
-    data = json.loads(result.output)
-    assert data["id"] == any_agent.id
-    assert data["name"] == any_agent.name
-
-
-def test_cli_agent_get_verbose(kweaver_client: KWeaverClient, any_agent, cli_runner):
-    """CLI agent get --verbose should return full details."""
-    result = cli_runner.invoke(cli, ["agent", "get", any_agent.id, "--verbose"])
-    assert result.exit_code == 0, f"agent get --verbose failed: {result.output}"
-    data = json.loads(result.output)
-    assert data["id"] == any_agent.id
-    # verbose output should have more fields
-    assert "status" in data

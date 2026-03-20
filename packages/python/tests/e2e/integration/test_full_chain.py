@@ -14,7 +14,6 @@ import pytest
 from kweaver import KWeaverClient
 from kweaver.types import Condition
 from kweaver.resources.context_loader import ContextLoaderResource
-from kweaver.cli.main import cli
 
 pytestmark = [pytest.mark.e2e, pytest.mark.destructive]
 
@@ -118,27 +117,5 @@ def test_mcp_query_instance_returns_data(kweaver_client: KWeaverClient, lifecycl
     )
 
 
-def test_cli_full_lifecycle(lifecycle_env, cli_runner):
-    """CLI commands should work against the built KN."""
-    if lifecycle_env["build_status"] != "completed":
-        pytest.skip("Build did not complete")
-    kn = lifecycle_env["kn"]
-    ot = lifecycle_env["ot"]
 
-    # bkn export
-    result = cli_runner.invoke(cli, ["bkn", "export", kn.id])
-    assert result.exit_code == 0
-
-    # bkn object-type list
-    result = cli_runner.invoke(cli, ["bkn", "object-type", "list", kn.id])
-    assert result.exit_code == 0
-    data = json.loads(result.output)
-    assert any(d.get("id") == ot.id for d in data)
-
-    # query search (may fail on newly built KN if not yet indexed for semantic search)
-    result = cli_runner.invoke(cli, ["query", "search", kn.id, "test"])
-    # Accept either success or validation error (semantic search may not be ready)
-    if result.exit_code != 0 and "必填信息" in result.output:
-        pass  # Semantic search not available yet for this KN — OK
-    else:
-        assert result.exit_code == 0, f"query search failed: {result.output}"
+# CLI lifecycle tests moved to TypeScript CLI (packages/typescript/test/e2e/)

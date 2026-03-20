@@ -377,10 +377,10 @@ export async function refreshAccessToken(client: ClientConfig, refreshToken: str
   return tokenConfig;
 }
 
-export async function ensureValidToken(): Promise<TokenConfig> {
+export async function ensureValidToken(opts?: { forceRefresh?: boolean }): Promise<TokenConfig> {
   const envToken = process.env.KWEAVER_TOKEN;
   const envBaseUrl = process.env.KWEAVER_BASE_URL;
-  if (envToken && envBaseUrl) {
+  if (!opts?.forceRefresh && envToken && envBaseUrl) {
     const rawToken = envToken.replace(/^Bearer\s+/i, "");
     return {
       baseUrl: normalizeBaseUrl(envBaseUrl),
@@ -405,13 +405,14 @@ export async function ensureValidToken(): Promise<TokenConfig> {
     );
   }
 
-  if (!token.expiresAt) {
-    return token;
-  }
-
-  const expiresAtMs = Date.parse(token.expiresAt);
-  if (Number.isNaN(expiresAtMs) || expiresAtMs - 60_000 > Date.now()) {
-    return token;
+  if (!opts?.forceRefresh) {
+    if (!token.expiresAt) {
+      return token;
+    }
+    const expiresAtMs = Date.parse(token.expiresAt);
+    if (Number.isNaN(expiresAtMs) || expiresAtMs - 60_000 > Date.now()) {
+      return token;
+    }
   }
 
   if (!token.refreshToken) {

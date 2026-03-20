@@ -8,7 +8,6 @@ import pytest
 
 from kweaver import KWeaverClient
 from kweaver.types import Condition
-from kweaver.cli.main import cli
 
 pytestmark = pytest.mark.e2e
 

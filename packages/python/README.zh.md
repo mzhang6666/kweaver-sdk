@@ -1,14 +1,15 @@
 # KWeaver Python SDK
 
-KWeaver 平台的 Python SDK + CLI — 支持 BKN（Business Knowledge Network）、Vega 数据管理和 Decision Agent。
+KWeaver 平台的 Python SDK — 支持 BKN（Business Knowledge Network）、Vega 数据管理和 Decision Agent。
+
+> **注意：** CLI 由 [TypeScript 包](../typescript/) 提供。本包仅为 SDK。
 
 [English](README.md)
 
 ## 安装
 
 ```bash
-pip install kweaver-sdk          # 仅 SDK
-pip install kweaver-sdk[cli]     # SDK + CLI
+pip install kweaver-sdk
 ```
 
 需要 **Python >= 3.10**。
@@ -88,54 +89,6 @@ client = KWeaverClient(auth=ConfigAuth(), dry_run=True)
 
 ---
 
-## CLI
-
-```bash
-pip install kweaver-sdk[cli]
-```
-
-### 上下文与状态
-
-```bash
-kweaver auth login https://kweaver.example.com   # 浏览器 OAuth 登录
-kweaver use kn-abc123                             # 设置默认 KN 上下文
-
-kweaver bkn                                       # KN 概览（= inspect）
-kweaver vega                                      # Vega 平台概览
-```
-
-### BKN 命令
-
-```bash
-kweaver bkn object-type list                      # 使用 'kweaver use' 设置的上下文
-kweaver bkn object-type get ot-456 -v             # 详细模式：含 data_properties
-kweaver bkn concept-group list
-kweaver bkn job list --status running
-kweaver bkn inspect --full
-```
-
-### Vega 命令
-
-```bash
-kweaver vega catalog list
-kweaver vega catalog health --all
-kweaver vega resource list --category table
-kweaver vega model list --type metric
-kweaver vega query dsl -d '{"query": {"match_all": {}}, "size": 5}'
-kweaver vega health
-kweaver vega inspect
-```
-
-### 全局选项
-
-```bash
-kweaver --debug bkn list           # 完整请求/响应诊断
-kweaver --dry-run bkn concept-group create kn-1 --name test   # 预览不发送
-kweaver --format json vega catalog list   # JSON 输出（默认 Markdown）
-```
-
----
-
 ## SDK 资源一览
 
 ### BKN（知识网络）
@@ -149,7 +102,7 @@ kweaver --format json vega catalog list   # JSON 输出（默认 Markdown）
 | 概念组 | `client.concept_groups` | `list`, `get`, `create`, `update`, `delete`, `add_members`, `remove_members` |
 | 任务 | `client.jobs` | `list`, `get_tasks`, `delete`, `wait` |
 | 查询 | `client.query` | `semantic_search`, `instances`, `instances_iter`, `kn_search`, `subgraph` |
-| Agent | `client.agents` | `list`, `get` |
+| Agent | `client.agents` | `list`, `get`, `get_by_key`, `create`, `update`, `delete`, `publish`, `unpublish` |
 | 对话 | `client.conversations` | `send_message`, `list_messages` |
 
 ### Vega（数据平台）

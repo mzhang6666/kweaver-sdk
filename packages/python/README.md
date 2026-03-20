@@ -1,14 +1,15 @@
 # KWeaver Python SDK
 
-Python SDK + CLI for the KWeaver platform — BKN (Business Knowledge Network), Vega data management, and Decision Agents.
+Python SDK for the KWeaver platform — BKN (Business Knowledge Network), Vega data management, and Decision Agents.
+
+> **Note:** The CLI is provided by the [TypeScript package](../typescript/). This package is SDK-only.
 
 [中文文档](README.zh.md)
 
 ## Installation
 
 ```bash
-pip install kweaver-sdk          # SDK only
-pip install kweaver-sdk[cli]     # SDK + CLI
+pip install kweaver-sdk
 ```
 
 Requires **Python >= 3.10**.
@@ -88,54 +89,6 @@ client = KWeaverClient(auth=ConfigAuth(), dry_run=True)
 
 ---
 
-## CLI
-
-```bash
-pip install kweaver-sdk[cli]
-```
-
-### Context & Status
-
-```bash
-kweaver auth login https://kweaver.example.com   # browser OAuth login
-kweaver use kn-abc123                             # set default KN context
-
-kweaver bkn                                       # KN overview (= inspect)
-kweaver vega                                      # Vega platform overview
-```
-
-### BKN Commands
-
-```bash
-kweaver bkn object-type list                      # uses context from 'kweaver use'
-kweaver bkn object-type get ot-456 -v             # verbose: includes data_properties
-kweaver bkn concept-group list
-kweaver bkn job list --status running
-kweaver bkn inspect --full
-```
-
-### Vega Commands
-
-```bash
-kweaver vega catalog list
-kweaver vega catalog health --all
-kweaver vega resource list --category table
-kweaver vega model list --type metric
-kweaver vega query dsl -d '{"query": {"match_all": {}}, "size": 5}'
-kweaver vega health
-kweaver vega inspect
-```
-
-### Global Flags
-
-```bash
-kweaver --debug bkn list           # full request/response diagnostics
-kweaver --dry-run bkn concept-group create kn-1 --name test   # preview without sending
-kweaver --format json vega catalog list   # output as JSON (default: markdown)
-```
-
----
-
 ## SDK Resources
 
 ### BKN (Knowledge Networks)
@@ -149,7 +102,7 @@ kweaver --format json vega catalog list   # output as JSON (default: markdown)
 | Concept Groups | `client.concept_groups` | `list`, `get`, `create`, `update`, `delete`, `add_members`, `remove_members` |
 | Jobs | `client.jobs` | `list`, `get_tasks`, `delete`, `wait` |
 | Query | `client.query` | `semantic_search`, `instances`, `instances_iter`, `kn_search`, `subgraph` |
-| Agents | `client.agents` | `list`, `get` |
+| Agents | `client.agents` | `list`, `get`, `get_by_key`, `create`, `update`, `delete`, `publish`, `unpublish` |
 | Conversations | `client.conversations` | `send_message`, `list_messages` |
 
 ### Vega (Data Platform)
@@ -187,7 +140,7 @@ KWeaverClient(
 | `KWEAVER_TOKEN` | Bearer token |
 | `KWEAVER_VEGA_URL` | Vega backend URL |
 | `KWEAVER_DEBUG` | Enable debug mode (`true`) |
-| `KWEAVER_FORMAT` | CLI output format (`md`/`json`/`yaml`) |
+| `KWEAVER_FORMAT` | Output format (`md`/`json`/`yaml`) |
 
 ---
 
