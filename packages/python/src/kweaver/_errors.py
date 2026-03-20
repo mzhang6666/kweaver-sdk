@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Any
+
 import httpx
 
 
@@ -59,6 +61,16 @@ class ServerError(KWeaverError):
 
 class NetworkError(KWeaverError):
     """Network unreachable (distinct from builtin ConnectionError)."""
+
+
+class DryRunIntercepted(KWeaverError):
+    """Raised when a write request is intercepted by dry-run mode."""
+
+    def __init__(self, method: str, url: str, body: Any = None) -> None:
+        self.method = method
+        self.url = url
+        self.body = body
+        super().__init__(f"[DRY RUN] {method} {url}")
 
 
 _STATUS_MAP: dict[int, type[KWeaverError]] = {
