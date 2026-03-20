@@ -65,18 +65,6 @@
 
 **关键约束**：`make test` 仅代表 UT，无外部依赖即可通过；E2E 由 `test-e2e` 单独入口执行。
 
-### Python 解释器（Cursor / VS Code）
-
-- 仓库已配置 **默认解释器**：`${workspaceFolder}/packages/python/.venv/bin/python`（见 `.vscode/settings.json`）。
-- **首次**在 `packages/python` 下创建 venv 并安装依赖（否则路径不存在、分析器仍报错）：
-
-```bash
-cd packages/python && python3 -m venv .venv && .venv/bin/pip install -e ".[dev]"
-```
-
-- **Windows**：若未使用 WSL，请在命令面板选择解释器，或把 `.vscode/settings.json` 里的路径改为 `packages/python/.venv/Scripts/python.exe`。
-- **Pyright / BasedPyright**：根目录 `pyrightconfig.json` 将 `venv` 指向 `packages/python/.venv`，与上文一致。
-
 ### 目录与入口
 
 - 测试目录：
