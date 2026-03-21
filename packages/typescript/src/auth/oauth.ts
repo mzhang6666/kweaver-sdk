@@ -47,13 +47,7 @@ export async function playwrightLogin(
     for (let i = 0; i < 30; i++) {
       await new Promise((r) => setTimeout(r, 1000));
 
-      // Check for login error messages
-      const errorEl = await page.$(".ant-message-error, .ant-alert-error");
-      if (errorEl) {
-        const errorText = await errorEl.textContent();
-        throw new Error(`Login failed: ${errorText?.trim() || "unknown error"}`);
-      }
-
+      // Check cookies first (works even after navigation)
       for (const cookie of await context.cookies()) {
         if (cookie.name === "dip.oauth2_token") {
           accessToken = decodeURIComponent(cookie.value);
@@ -61,6 +55,18 @@ export async function playwrightLogin(
         }
       }
       if (accessToken) break;
+
+      // Check for login error messages (may fail after navigation, that's OK)
+      try {
+        const errorEl = await page.$(".ant-message-error, .ant-alert-error");
+        if (errorEl) {
+          const errorText = await errorEl.textContent();
+          throw new Error(`Login failed: ${errorText?.trim() || "unknown error"}`);
+        }
+      } catch (e) {
+        // If it's our own login error, re-throw; otherwise ignore (navigation destroyed context)
+        if (e instanceof Error && e.message.startsWith("Login failed:")) throw e;
+      }
     }
 
     if (!accessToken) {
