@@ -12,45 +12,10 @@ import {
   setPlatformAlias,
 } from "../config/store.js";
 import {
-  ensureValidToken,
   formatHttpError,
   normalizeBaseUrl,
   playwrightLogin,
 } from "../auth/oauth.js";
-import { createInterface } from "node:readline";
-
-function promptInput(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    rl.question(question, (answer) => {
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
-
-function promptPassword(question: string): Promise<string> {
-  return new Promise((resolve) => {
-    const rl = createInterface({ input: process.stdin, output: process.stdout });
-    // Mute output for password
-    const origWrite = process.stdout.write.bind(process.stdout);
-    let prompted = false;
-    process.stdout.write = ((chunk: any, ...args: any[]) => {
-      if (!prompted && typeof chunk === "string" && chunk.includes(question)) {
-        prompted = true;
-        return origWrite(chunk, ...args);
-      }
-      if (prompted) return true as any;
-      return origWrite(chunk, ...args);
-    }) as typeof process.stdout.write;
-    rl.question(question, (answer) => {
-      process.stdout.write = origWrite;
-      console.log(); // newline
-      rl.close();
-      resolve(answer);
-    });
-  });
-}
 
 export async function runAuthCommand(args: string[]): Promise<number> {
   const target = args[0];
@@ -80,17 +45,17 @@ kweaver auth delete <url>    Delete saved credentials`);
     try {
       const normalizedTarget = normalizeBaseUrl(target);
       const alias = readOption(args, "--alias");
+      const username = readOption(args, "--username") ?? readOption(args, "-u");
+      const password = readOption(args, "--password") ?? readOption(args, "-p");
 
-      const username = await promptInput("Username: ");
-      const password = await promptPassword("Password: ");
-
-      if (!username || !password) {
-        console.error("Username and password are required.");
-        return 1;
+      if (username && password) {
+        console.log("Logging in (headless)...");
+      } else {
+        console.log("Opening browser for login...");
       }
-
-      console.log("Logging in...");
-      const token = await playwrightLogin(normalizedTarget, username, password);
+      const token = await playwrightLogin(normalizedTarget,
+        username && password ? { username, password } : undefined,
+      );
 
       if (alias) {
         setPlatformAlias(normalizedTarget, alias);

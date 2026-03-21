@@ -15,8 +15,7 @@ export function normalizeBaseUrl(value: string): string {
 
 export async function playwrightLogin(
   baseUrl: string,
-  username: string,
-  password: string,
+  options?: { username?: string; password?: string },
 ): Promise<TokenConfig> {
   let chromium: typeof import("playwright").chromium;
   try {
@@ -28,7 +27,8 @@ export async function playwrightLogin(
     );
   }
 
-  const browser = await chromium.launch({ headless: true });
+  const hasCredentials = options?.username && options?.password;
+  const browser = await chromium.launch({ headless: hasCredentials ? true : false });
   try {
     const context = await browser.newContext();
     const page = await context.newPage();
@@ -38,16 +38,21 @@ export async function playwrightLogin(
       timeout: 30_000,
     });
 
-    await page.waitForSelector('input[name="account"]', { timeout: 10_000 });
-    await page.fill('input[name="account"]', username);
-    await page.fill('input[name="password"]', password);
-    await page.click("button.ant-btn-primary");
+    if (hasCredentials) {
+      // Headless mode: auto-fill credentials
+      await page.waitForSelector('input[name="account"]', { timeout: 10_000 });
+      await page.fill('input[name="account"]', options.username!);
+      await page.fill('input[name="password"]', options.password!);
+      await page.click("button.ant-btn-primary");
+    }
+    // else: headed mode — user logs in manually in the browser window
 
+    const TIMEOUT_SECONDS = hasCredentials ? 30 : 120;
     let accessToken: string | null = null;
-    for (let i = 0; i < 30; i++) {
+    for (let i = 0; i < TIMEOUT_SECONDS; i++) {
       await new Promise((r) => setTimeout(r, 1000));
 
-      // Check cookies first (works even after navigation)
+      // Check cookies (works even after navigation)
       for (const cookie of await context.cookies()) {
         if (cookie.name === "dip.oauth2_token") {
           accessToken = decodeURIComponent(cookie.value);
@@ -56,23 +61,23 @@ export async function playwrightLogin(
       }
       if (accessToken) break;
 
-      // Check for login error messages (may fail after navigation, that's OK)
-      try {
-        const errorEl = await page.$(".ant-message-error, .ant-alert-error");
-        if (errorEl) {
-          const errorText = await errorEl.textContent();
-          throw new Error(`Login failed: ${errorText?.trim() || "unknown error"}`);
+      // In headless mode, check for login error messages
+      if (hasCredentials) {
+        try {
+          const errorEl = await page.$(".ant-message-error, .ant-alert-error");
+          if (errorEl) {
+            const errorText = await errorEl.textContent();
+            throw new Error(`Login failed: ${errorText?.trim() || "unknown error"}`);
+          }
+        } catch (e) {
+          if (e instanceof Error && e.message.startsWith("Login failed:")) throw e;
         }
-      } catch (e) {
-        // If it's our own login error, re-throw; otherwise ignore (navigation destroyed context)
-        if (e instanceof Error && e.message.startsWith("Login failed:")) throw e;
       }
     }
 
     if (!accessToken) {
       throw new Error(
-        "Login timed out: dip.oauth2_token cookie not received within 30 seconds. " +
-        "Check username/password."
+        `Login timed out: dip.oauth2_token cookie not received within ${TIMEOUT_SECONDS} seconds.`
       );
     }
 
