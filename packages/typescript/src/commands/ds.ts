@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline";
 import { ensureValidToken, formatHttpError } from "../auth/oauth.js";
+import { HttpError } from "../utils/http.js";
 import {
   testDatasource,
   createDatasource,
@@ -47,26 +48,32 @@ Subcommands:
     return 0;
   }
 
-  try {
-    if (subcommand === "list") {
-      return runDsListCommand(rest);
-    }
-    if (subcommand === "get") {
-      return runDsGetCommand(rest);
-    }
-    if (subcommand === "delete") {
-      return runDsDeleteCommand(rest);
-    }
-    if (subcommand === "tables") {
-      return runDsTablesCommand(rest);
-    }
-    if (subcommand === "connect") {
-      return runDsConnectCommand(rest);
-    }
+  const dispatch = (): Promise<number> => {
+    if (subcommand === "list") return runDsListCommand(rest);
+    if (subcommand === "get") return runDsGetCommand(rest);
+    if (subcommand === "delete") return runDsDeleteCommand(rest);
+    if (subcommand === "tables") return runDsTablesCommand(rest);
+    if (subcommand === "connect") return runDsConnectCommand(rest);
+    return Promise.resolve(-1);
+  };
 
-    console.error(`Unknown ds subcommand: ${subcommand}`);
-    return 1;
+  try {
+    const code = await dispatch();
+    if (code === -1) {
+      console.error(`Unknown ds subcommand: ${subcommand}`);
+      return 1;
+    }
+    return code;
   } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      try {
+        await ensureValidToken({ forceRefresh: true });
+        return await dispatch();
+      } catch (retryError) {
+        console.error(formatHttpError(retryError));
+        return 1;
+      }
+    }
     console.error(formatHttpError(error));
     return 1;
   }

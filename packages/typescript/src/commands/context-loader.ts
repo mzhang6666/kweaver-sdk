@@ -1,4 +1,5 @@
 import { ensureValidToken, formatHttpError } from "../auth/oauth.js";
+import { HttpError } from "../utils/http.js";
 import type { ConditionSpec, RelationTypePath } from "../api/context-loader.js";
 import {
   knSearch,
@@ -89,10 +90,6 @@ Examples:
     return runConfigCommand(rest);
   }
 
-  const token = await ensureValidToken();
-  const base = ensureContextLoaderConfig();
-  const options = { ...base, accessToken: token.accessToken };
-
   let pretty = true;
   const prettyIdx = rest.indexOf("--pretty");
   if (prettyIdx !== -1) {
@@ -100,50 +97,46 @@ Examples:
     rest.splice(prettyIdx, 1);
   }
 
+  const dispatch = async (): Promise<number> => {
+    const token = await ensureValidToken();
+    const base = ensureContextLoaderConfig();
+    const options = { ...base, accessToken: token.accessToken };
+
+    if (subcommand === "tools") return runListTools(options, rest, pretty);
+    if (subcommand === "resources") return runListResources(options, rest, pretty);
+    if (subcommand === "resource") return runReadResource(options, rest, pretty);
+    if (subcommand === "templates") return runListTemplates(options, rest, pretty);
+    if (subcommand === "prompts") return runListPrompts(options, rest, pretty);
+    if (subcommand === "prompt") return runGetPrompt(options, rest, pretty);
+    if (subcommand === "kn-search") return runKnSearch(options, rest, pretty);
+    if (subcommand === "kn-schema-search") return runKnSchemaSearch(options, rest, pretty);
+    if (subcommand === "query-object-instance") return runQueryObjectInstance(options, rest, pretty);
+    if (subcommand === "query-instance-subgraph") return runQueryInstanceSubgraph(options, rest, pretty);
+    if (subcommand === "get-logic-properties") return runGetLogicProperties(options, rest, pretty);
+    if (subcommand === "get-action-info") return runGetActionInfo(options, rest, pretty);
+    return -1;
+  };
+
   try {
-    if (subcommand === "tools") {
-      return await runListTools(options, rest, pretty);
+    const code = await dispatch();
+    if (code === -1) {
+      console.error(`Unknown context-loader subcommand: ${subcommand}`);
+      return 1;
     }
-    if (subcommand === "resources") {
-      return await runListResources(options, rest, pretty);
-    }
-    if (subcommand === "resource") {
-      return await runReadResource(options, rest, pretty);
-    }
-    if (subcommand === "templates") {
-      return await runListTemplates(options, rest, pretty);
-    }
-    if (subcommand === "prompts") {
-      return await runListPrompts(options, rest, pretty);
-    }
-    if (subcommand === "prompt") {
-      return await runGetPrompt(options, rest, pretty);
-    }
-    if (subcommand === "kn-search") {
-      return await runKnSearch(options, rest, pretty);
-    }
-    if (subcommand === "kn-schema-search") {
-      return await runKnSchemaSearch(options, rest, pretty);
-    }
-    if (subcommand === "query-object-instance") {
-      return await runQueryObjectInstance(options, rest, pretty);
-    }
-    if (subcommand === "query-instance-subgraph") {
-      return await runQueryInstanceSubgraph(options, rest, pretty);
-    }
-    if (subcommand === "get-logic-properties") {
-      return await runGetLogicProperties(options, rest, pretty);
-    }
-    if (subcommand === "get-action-info") {
-      return await runGetActionInfo(options, rest, pretty);
-    }
+    return code;
   } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      try {
+        await ensureValidToken({ forceRefresh: true });
+        return await dispatch();
+      } catch (retryError) {
+        console.error(formatHttpError(retryError));
+        return 1;
+      }
+    }
     console.error(formatHttpError(error));
     return 1;
   }
-
-  console.error(`Unknown context-loader subcommand: ${subcommand}`);
-  return 1;
 }
 
 async function runConfigCommand(args: string[]): Promise<number> {

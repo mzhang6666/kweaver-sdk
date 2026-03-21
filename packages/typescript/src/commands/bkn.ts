@@ -3,6 +3,7 @@ import { execSync, spawnSync } from "node:child_process";
 import { mkdirSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { resolve } from "node:path";
 import { ensureValidToken, formatHttpError } from "../auth/oauth.js";
+import { HttpError } from "../utils/http.js";
 import {
   listKnowledgeNetworks,
   getKnowledgeNetwork,
@@ -764,80 +765,52 @@ export async function runKnCommand(args: string[]): Promise<number> {
     return 0;
   }
 
-  if (subcommand === "list") {
-    return runKnListCommand(rest);
-  }
+  const dispatch = (): Promise<number> => {
+    if (subcommand === "list") return runKnListCommand(rest);
+    if (subcommand === "get") return runKnGetCommand(rest);
+    if (subcommand === "create") return runKnCreateCommand(rest);
+    if (subcommand === "create-from-ds") return runKnCreateFromDsCommand(rest);
+    if (subcommand === "update") return runKnUpdateCommand(rest);
+    if (subcommand === "delete") return runKnDeleteCommand(rest);
+    if (subcommand === "build") return runKnBuildCommand(rest);
+    if (subcommand === "push") return runKnPushCommand(rest);
+    if (subcommand === "pull") return runKnPullCommand(rest);
+    if (subcommand === "export")
+      return runKnGetCommand([...(rest[0] ? [rest[0]] : []), "--export", ...rest.slice(1)]);
+    if (subcommand === "stats")
+      return runKnGetCommand([...(rest[0] ? [rest[0]] : []), "--stats", ...rest.slice(1)]);
+    if (subcommand === "search") return runKnSearchCommand(rest);
+    if (subcommand === "object-type") return runKnObjectTypeCommand(rest);
+    if (subcommand === "relation-type") return runKnRelationTypeCommand(rest);
+    if (subcommand === "subgraph") return runKnSubgraphCommand(rest);
+    if (subcommand === "action-type") return runKnActionTypeCommand(rest);
+    if (subcommand === "action-execution") return runKnActionExecutionCommand(rest);
+    if (subcommand === "action-log") return runKnActionLogCommand(rest);
+    return Promise.resolve(-1);
+  };
 
-  if (subcommand === "get") {
-    return runKnGetCommand(rest);
+  try {
+    const code = await dispatch();
+    if (code === -1) {
+      console.error(`Unknown bkn subcommand: ${subcommand}`);
+      return 1;
+    }
+    return code;
+  } catch (error) {
+    // Auto-retry on 401: force-refresh the token and re-run the subcommand.
+    // The subcommand will call ensureValidToken() again and pick up the fresh token.
+    if (error instanceof HttpError && error.status === 401) {
+      try {
+        await ensureValidToken({ forceRefresh: true });
+        return await dispatch();
+      } catch (retryError) {
+        console.error(formatHttpError(retryError));
+        return 1;
+      }
+    }
+    console.error(formatHttpError(error));
+    return 1;
   }
-
-  if (subcommand === "create") {
-    return runKnCreateCommand(rest);
-  }
-
-  if (subcommand === "create-from-ds") {
-    return runKnCreateFromDsCommand(rest);
-  }
-
-  if (subcommand === "update") {
-    return runKnUpdateCommand(rest);
-  }
-
-  if (subcommand === "delete") {
-    return runKnDeleteCommand(rest);
-  }
-
-  if (subcommand === "build") {
-    return runKnBuildCommand(rest);
-  }
-
-  if (subcommand === "push") {
-    return runKnPushCommand(rest);
-  }
-
-  if (subcommand === "pull") {
-    return runKnPullCommand(rest);
-  }
-
-  if (subcommand === "export") {
-    return runKnGetCommand([...(rest[0] ? [rest[0]] : []), "--export", ...rest.slice(1)]);
-  }
-
-  if (subcommand === "stats") {
-    return runKnGetCommand([...(rest[0] ? [rest[0]] : []), "--stats", ...rest.slice(1)]);
-  }
-
-  if (subcommand === "search") {
-    return runKnSearchCommand(rest);
-  }
-
-  if (subcommand === "object-type") {
-    return runKnObjectTypeCommand(rest);
-  }
-
-  if (subcommand === "relation-type") {
-    return runKnRelationTypeCommand(rest);
-  }
-
-  if (subcommand === "subgraph") {
-    return runKnSubgraphCommand(rest);
-  }
-
-  if (subcommand === "action-type") {
-    return runKnActionTypeCommand(rest);
-  }
-
-  if (subcommand === "action-execution") {
-    return runKnActionExecutionCommand(rest);
-  }
-
-  if (subcommand === "action-log") {
-    return runKnActionLogCommand(rest);
-  }
-
-  console.error(`Unknown bkn subcommand: ${subcommand}`);
-  return 1;
 }
 
 /** Parse object-type create args: --name --dataview-id --primary-key --display-key [--property '<json>' ...] */

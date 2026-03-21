@@ -26,5 +26,5 @@ kweaver ds connect mysql db.example.com 3306 erp --account root --password pass1
 kweaver ds tables ds-abc123
 
 # 连接后创建知识网络
-kweaver bkn create ds-abc123 --name "erp-kn" --tables "orders,products" --wait
+kweaver bkn create-from-ds ds-abc123 --name "erp-kn" --tables "orders,products" --build
 ```

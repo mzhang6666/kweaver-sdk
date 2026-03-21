@@ -420,6 +420,30 @@ export async function ensureValidToken(opts?: { forceRefresh?: boolean }): Promi
   return refreshAccessToken(client, token.refreshToken);
 }
 
+/**
+ * Execute an async function that requires a valid token.
+ * If the function throws an HttpError with status 401, automatically
+ * force-refresh the token and retry once.
+ *
+ * This handles the case where the server revokes a token before its
+ * locally-stored expiry time — ensureValidToken() thinks it's valid
+ * but the server rejects it.
+ */
+export async function withTokenRetry<T>(
+  fn: (token: TokenConfig) => Promise<T>,
+): Promise<T> {
+  const token = await ensureValidToken();
+  try {
+    return await fn(token);
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      const freshToken = await ensureValidToken({ forceRefresh: true });
+      return fn(freshToken);
+    }
+    throw error;
+  }
+}
+
 export interface AuthLoginOptions {
   baseUrl: string;
   port: number;

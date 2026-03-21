@@ -47,6 +47,12 @@ kweaver bkn relation-type update <kn_id> <rt_id> [--name <n>]
 kweaver bkn relation-type delete <kn_id> <rt_ids> [--yes/-y]
 ```
 
+## Search
+
+```bash
+kweaver bkn search <kn_id> <query> [--max-concepts <n>] [--mode <mode>]   # 语义搜索
+```
+
 ## Subgraph
 
 ```bash

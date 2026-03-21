@@ -172,25 +172,26 @@ Options:
     return 1;
   }
 
-  try {
+  const execute = async (): Promise<number> => {
     const token = await ensureValidToken();
 
     // Prepend baseUrl when the URL is a relative path (no scheme)
-    if (invocation.url.startsWith("/")) {
-      invocation.url = token.baseUrl.replace(/\/+$/, "") + invocation.url;
-    }
+    const url = invocation.url.startsWith("/")
+      ? token.baseUrl.replace(/\/+$/, "") + invocation.url
+      : invocation.url;
 
-    injectAuthHeaders(invocation.headers, token.accessToken, invocation.businessDomain);
+    const headers = new Headers(invocation.headers);
+    injectAuthHeaders(headers, token.accessToken, invocation.businessDomain);
 
     if (invocation.verbose) {
-      for (const line of formatVerboseRequest(invocation)) {
+      for (const line of formatVerboseRequest({ ...invocation, url, headers })) {
         console.error(line);
       }
     }
 
-    const response = await fetch(invocation.url, {
+    const response = await fetch(url, {
       method: invocation.method,
-      headers: invocation.headers,
+      headers,
       body: invocation.body,
     });
 
@@ -204,7 +205,20 @@ Options:
       console.log(formatCallOutput(text, invocation.pretty));
     }
     return 0;
+  };
+
+  try {
+    return await execute();
   } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      try {
+        await ensureValidToken({ forceRefresh: true });
+        return await execute();
+      } catch (retryError) {
+        console.error(formatHttpError(retryError));
+        return 1;
+      }
+    }
     console.error(formatHttpError(error));
     return 1;
   }
