@@ -1,5 +1,6 @@
 import { createInterface } from "node:readline";
 import { ensureValidToken, formatHttpError } from "../auth/oauth.js";
+import { HttpError } from "../utils/http.js";
 import {
   testDatasource,
   createDatasource,
@@ -10,6 +11,7 @@ import {
   listTablesWithColumns,
 } from "../api/datasources.js";
 import { formatCallOutput } from "./call.js";
+import { resolveBusinessDomain } from "../config/store.js";
 
 function confirmYes(prompt: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -46,26 +48,32 @@ Subcommands:
     return 0;
   }
 
-  try {
-    if (subcommand === "list") {
-      return runDsListCommand(rest);
-    }
-    if (subcommand === "get") {
-      return runDsGetCommand(rest);
-    }
-    if (subcommand === "delete") {
-      return runDsDeleteCommand(rest);
-    }
-    if (subcommand === "tables") {
-      return runDsTablesCommand(rest);
-    }
-    if (subcommand === "connect") {
-      return runDsConnectCommand(rest);
-    }
+  const dispatch = (): Promise<number> => {
+    if (subcommand === "list") return runDsListCommand(rest);
+    if (subcommand === "get") return runDsGetCommand(rest);
+    if (subcommand === "delete") return runDsDeleteCommand(rest);
+    if (subcommand === "tables") return runDsTablesCommand(rest);
+    if (subcommand === "connect") return runDsConnectCommand(rest);
+    return Promise.resolve(-1);
+  };
 
-    console.error(`Unknown ds subcommand: ${subcommand}`);
-    return 1;
+  try {
+    const code = await dispatch();
+    if (code === -1) {
+      console.error(`Unknown ds subcommand: ${subcommand}`);
+      return 1;
+    }
+    return code;
   } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      try {
+        await ensureValidToken({ forceRefresh: true });
+        return await dispatch();
+      } catch (retryError) {
+        console.error(formatHttpError(retryError));
+        return 1;
+      }
+    }
     console.error(formatHttpError(error));
     return 1;
   }
@@ -79,7 +87,7 @@ export function parseDsListArgs(args: string[]): {
 } {
   let keyword: string | undefined;
   let type: string | undefined;
-  let businessDomain = "bd_public";
+  let businessDomain = "";
   let pretty = true;
 
   for (let i = 0; i < args.length; i += 1) {
@@ -102,6 +110,7 @@ export function parseDsListArgs(args: string[]): {
       continue;
     }
   }
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
   return { keyword, type, businessDomain, pretty };
 }
 

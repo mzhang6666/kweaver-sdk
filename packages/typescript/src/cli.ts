@@ -2,6 +2,7 @@ import { runAgentCommand } from "./commands/agent.js";
 import { runAuthCommand } from "./commands/auth.js";
 import { runKnCommand } from "./commands/bkn.js";
 import { runCallCommand } from "./commands/call.js";
+import { runConfigCommand } from "./commands/config.js";
 import { runContextLoaderCommand } from "./commands/context-loader.js";
 import { runDsCommand } from "./commands/ds.js";
 import { runTokenCommand } from "./commands/token.js";
@@ -33,6 +34,7 @@ Usage:
   kweaver bkn create [options]
   kweaver bkn update <kn-id> [options]
   kweaver bkn delete <kn-id>
+  kweaver config [set-bd|show]
   kweaver vega [health|stats|inspect|catalog|resource|connector-type]
   kweaver context-loader [config|kn-search|...]
   kweaver --help
@@ -44,6 +46,7 @@ Commands:
   ds             Manage datasources (list, get, delete, tables, connect)
   agent          Chat with a KWeaver agent (agent chat <id>), list published agents (agent list)
   bkn           Business knowledge network (list/get/create/update/delete/export/stats; object-type, subgraph, action-type, action-log)
+  config         Per-platform configuration (business domain)
   vega           Vega observability platform (catalogs, resources, connector-types, health)
   context-loader Call context-loader MCP (tools, resources, prompts; kn-search, query-*, etc.)
   help           Show this message`);
@@ -83,6 +86,10 @@ export async function run(argv: string[]): Promise<number> {
 
   if (command === "vega") {
     return runVegaCommand(rest);
+  }
+
+  if (command === "config") {
+    return runConfigCommand(rest);
   }
 
   if (command === "context-loader" || command === "context") {

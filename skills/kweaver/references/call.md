@@ -16,6 +16,7 @@ kweaver call <path> [-X <method>] [-d '<json>'] [-H 'Name: Value' ...] [-bd <dom
 | `-H` | 额外请求头（可重复） |
 | `-bd` | 覆盖 business domain |
 | `-v` | 打印请求信息到 stderr |
+| `--pretty` | Pretty-print JSON 输出（默认开启） |
 
 ## 示例
 

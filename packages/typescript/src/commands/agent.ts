@@ -1,4 +1,5 @@
 import { ensureValidToken, formatHttpError } from "../auth/oauth.js";
+import { HttpError } from "../utils/http.js";
 import { runAgentChatCommand } from "./agent-chat.js";
 import {
   listAgents, getAgent, getAgentByKey,
@@ -7,6 +8,7 @@ import {
 } from "../api/agent-list.js";
 import { listConversations, listMessages } from "../api/conversations.js";
 import { formatCallOutput } from "./call.js";
+import { resolveBusinessDomain } from "../config/store.js";
 
 export interface AgentListOptions {
   name: string;
@@ -87,7 +89,7 @@ export function parseAgentListArgs(args: string[]): AgentListOptions {
   let category_id = "";
   let custom_space_id = "";
   let is_to_square = 1;
-  let businessDomain = "bd_public";
+  let businessDomain = "";
   let pretty = true;
   let verbose = false;
 
@@ -163,6 +165,7 @@ export function parseAgentListArgs(args: string[]): AgentListOptions {
     throw new Error(`Unsupported agent list argument: ${arg}`);
   }
 
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
   return {
     name,
     offset,
@@ -189,7 +192,7 @@ export function parseAgentSessionsArgs(args: string[]): AgentSessionsOptions {
     throw new Error("Missing agent_id");
   }
 
-  let businessDomain = "bd_public";
+  let businessDomain = "";
   let limit: number | undefined;
   let pretty = true;
 
@@ -229,6 +232,7 @@ export function parseAgentSessionsArgs(args: string[]): AgentSessionsOptions {
     throw new Error(`Unsupported agent sessions argument: ${arg}`);
   }
 
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
   return { agentId, businessDomain, limit, pretty };
 }
 
@@ -245,7 +249,7 @@ export function parseAgentHistoryArgs(args: string[]): AgentHistoryOptions {
     throw new Error("Missing conversation_id");
   }
 
-  let businessDomain = "bd_public";
+  let businessDomain = "";
   let limit: number | undefined;
   let pretty = true;
 
@@ -285,10 +289,11 @@ export function parseAgentHistoryArgs(args: string[]): AgentHistoryOptions {
     throw new Error(`Unsupported agent history argument: ${arg}`);
   }
 
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
   return { conversationId, businessDomain, limit, pretty };
 }
 
-export function runAgentCommand(args: string[]): Promise<number> {
+export async function runAgentCommand(args: string[]): Promise<number> {
   const [subcommand, ...rest] = args;
 
   if (!subcommand || subcommand === "--help" || subcommand === "-h") {
@@ -312,6 +317,22 @@ Subcommands:
     return Promise.resolve(0);
   }
 
+  const dispatch = async (): Promise<number> => {
+    if (subcommand === "chat") return runAgentChatCommand(rest);
+    if (subcommand === "get") return runAgentGetCommand(rest);
+    if (subcommand === "list") return runAgentListCommand(rest);
+    if (subcommand === "sessions") return runAgentSessionsCommand(rest);
+    if (subcommand === "history") return runAgentHistoryCommand(rest);
+    if (subcommand === "get-by-key") return runAgentGetByKeyCommand(rest);
+    if (subcommand === "create") return runAgentCreateCommand(rest);
+    if (subcommand === "update") return runAgentUpdateCommand(rest);
+    if (subcommand === "delete") return runAgentDeleteCommand(rest);
+    if (subcommand === "publish") return runAgentPublishCommand(rest);
+    if (subcommand === "unpublish") return runAgentUnpublishCommand(rest);
+    return -1;
+  };
+
+  // Show subcommand-specific help inline (no retry needed)
   if (subcommand === "chat") {
     if (rest.length === 1 && (rest[0] === "--help" || rest[0] === "-h")) {
       console.log(`kweaver agent chat <agent_id> [-m "message"] [options]
@@ -350,9 +371,8 @@ Options:
   --verbose, -v             Show full JSON response
   -bd, --biz-domain <value>  Business domain (default: bd_public)
   --pretty                   Pretty-print JSON output (default)`);
-      return Promise.resolve(0);
+      return 0;
     }
-    return runAgentGetCommand(rest);
   }
 
   if (subcommand === "list") {
@@ -371,9 +391,8 @@ Options:
   --verbose, -v             Show full JSON response
   -bd, --biz-domain <value>  Business domain (default: bd_public)
   --pretty                  Pretty-print JSON output (applies to both modes)`);
-      return Promise.resolve(0);
+      return 0;
     }
-    return runAgentListCommand(rest);
   }
 
   if (subcommand === "sessions") {
@@ -386,9 +405,8 @@ Options:
   --limit <n>              Max conversations to return
   -bd, --biz-domain <value> Business domain (default: bd_public)
   --pretty                  Pretty-print JSON output (default)`);
-      return Promise.resolve(0);
+      return 0;
     }
-    return runAgentSessionsCommand(rest);
   }
 
   if (subcommand === "history") {
@@ -401,37 +419,30 @@ Options:
   --limit <n>              Max messages to return
   -bd, --biz-domain <value> Business domain (default: bd_public)
   --pretty                  Pretty-print JSON output (default)`);
-      return Promise.resolve(0);
+      return 0;
     }
-    return runAgentHistoryCommand(rest);
   }
 
-  if (subcommand === "get-by-key") {
-    return runAgentGetByKeyCommand(rest);
+  try {
+    const code = await dispatch();
+    if (code === -1) {
+      console.error(`Unknown agent subcommand: ${subcommand}`);
+      return 1;
+    }
+    return code;
+  } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      try {
+        await ensureValidToken({ forceRefresh: true });
+        return await dispatch();
+      } catch (retryError) {
+        console.error(formatHttpError(retryError));
+        return 1;
+      }
+    }
+    console.error(formatHttpError(error));
+    return 1;
   }
-
-  if (subcommand === "create") {
-    return runAgentCreateCommand(rest);
-  }
-
-  if (subcommand === "update") {
-    return runAgentUpdateCommand(rest);
-  }
-
-  if (subcommand === "delete") {
-    return runAgentDeleteCommand(rest);
-  }
-
-  if (subcommand === "publish") {
-    return runAgentPublishCommand(rest);
-  }
-
-  if (subcommand === "unpublish") {
-    return runAgentUnpublishCommand(rest);
-  }
-
-  console.error(`Unknown agent subcommand: ${subcommand}`);
-  return Promise.resolve(1);
 }
 
 export interface AgentGetOptions {
@@ -447,7 +458,7 @@ export function parseAgentGetArgs(args: string[]): AgentGetOptions {
     throw new Error("Missing agent_id. Usage: kweaver agent get <agent_id> [options]");
   }
 
-  let businessDomain = "bd_public";
+  let businessDomain = "";
   let pretty = true;
   let verbose = false;
 
@@ -480,6 +491,7 @@ export function parseAgentGetArgs(args: string[]): AgentGetOptions {
     throw new Error(`Unsupported agent get argument: ${arg}`);
   }
 
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
   return { agentId, businessDomain, pretty, verbose };
 }
 
@@ -697,7 +709,7 @@ async function runAgentCreateCommand(args: string[]): Promise<number> {
   let systemPrompt = "";
   let llmId = "";
   let llmMaxTokens = 4096;
-  let businessDomain = "bd_public";
+  let businessDomain = "";
 
   for (let i = 0; i < args.length; i += 1) {
     const arg = args[i];
@@ -728,6 +740,8 @@ Optional:
     if (arg === "--llm-max-tokens") { llmMaxTokens = parseInt(args[++i] ?? "4096", 10); continue; }
     if (arg === "-bd" || arg === "--biz-domain") { businessDomain = args[++i] ?? "bd_public"; continue; }
   }
+
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
 
   if (!name) { console.error("--name is required"); return 1; }
   if (!profile) { console.error("--profile is required"); return 1; }

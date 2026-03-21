@@ -1,4 +1,5 @@
 import { ensureValidToken, formatHttpError } from "../auth/oauth.js";
+import { HttpError } from "../utils/http.js";
 import {
   vegaHealth,
   listVegaCatalogs,
@@ -16,6 +17,7 @@ import {
   listVegaDiscoverTasks,
 } from "../api/vega.js";
 import { formatCallOutput } from "./call.js";
+import { resolveBusinessDomain } from "../config/store.js";
 
 // ---------------------------------------------------------------------------
 // Help
@@ -55,7 +57,7 @@ function parseCommonFlags(args: string[]): {
   businessDomain: string;
   pretty: boolean;
 } {
-  let businessDomain = "bd_public";
+  let businessDomain = "";
   let pretty = true;
   const remaining: string[] = [];
 
@@ -72,6 +74,7 @@ function parseCommonFlags(args: string[]): {
     remaining.push(arg);
   }
 
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
   return { remaining, businessDomain, pretty };
 }
 
@@ -87,17 +90,33 @@ export async function runVegaCommand(args: string[]): Promise<number> {
     return 0;
   }
 
-  try {
-    if (subcommand === "health") return await runVegaHealthCommand(rest);
-    if (subcommand === "stats") return await runVegaStatsCommand(rest);
-    if (subcommand === "inspect") return await runVegaInspectCommand(rest);
-    if (subcommand === "catalog") return await runVegaCatalogCommand(rest);
-    if (subcommand === "resource") return await runVegaResourceCommand(rest);
-    if (subcommand === "connector-type") return await runVegaConnectorTypeCommand(rest);
+  const dispatch = (): Promise<number> => {
+    if (subcommand === "health") return runVegaHealthCommand(rest);
+    if (subcommand === "stats") return runVegaStatsCommand(rest);
+    if (subcommand === "inspect") return runVegaInspectCommand(rest);
+    if (subcommand === "catalog") return runVegaCatalogCommand(rest);
+    if (subcommand === "resource") return runVegaResourceCommand(rest);
+    if (subcommand === "connector-type") return runVegaConnectorTypeCommand(rest);
+    return Promise.resolve(-1);
+  };
 
-    console.error(`Unknown vega subcommand: ${subcommand}`);
-    return 1;
+  try {
+    const code = await dispatch();
+    if (code === -1) {
+      console.error(`Unknown vega subcommand: ${subcommand}`);
+      return 1;
+    }
+    return code;
   } catch (error) {
+    if (error instanceof HttpError && error.status === 401) {
+      try {
+        await ensureValidToken({ forceRefresh: true });
+        return await dispatch();
+      } catch (retryError) {
+        console.error(formatHttpError(retryError));
+        return 1;
+      }
+    }
     console.error(formatHttpError(error));
     return 1;
   }

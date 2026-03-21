@@ -523,3 +523,44 @@ export function listPlatforms(): PlatformSummary[] {
   items.sort((a, b) => a.baseUrl.localeCompare(b.baseUrl));
   return items;
 }
+
+/** Per-platform config (not auth — general settings). */
+export interface PlatformConfig {
+  businessDomain?: string;
+}
+
+function loadPlatformConfig(baseUrl: string): PlatformConfig | null {
+  ensureStoreReady();
+  return readJsonFile<PlatformConfig>(getPlatformFile(baseUrl, "config.json"));
+}
+
+function savePlatformConfig(baseUrl: string, config: PlatformConfig): void {
+  ensureStoreReady();
+  ensurePlatformDir(baseUrl);
+  writeJsonFile(getPlatformFile(baseUrl, "config.json"), config);
+}
+
+export function loadPlatformBusinessDomain(baseUrl: string): string | null {
+  return loadPlatformConfig(baseUrl)?.businessDomain ?? null;
+}
+
+export function savePlatformBusinessDomain(baseUrl: string, businessDomain: string): void {
+  const existing = loadPlatformConfig(baseUrl) ?? {};
+  savePlatformConfig(baseUrl, { ...existing, businessDomain });
+}
+
+/**
+ * Resolve businessDomain: env var > per-platform config > "bd_public".
+ * If baseUrl is omitted, uses the current platform.
+ */
+export function resolveBusinessDomain(baseUrl?: string): string {
+  const fromEnv = process.env.KWEAVER_BUSINESS_DOMAIN;
+  if (fromEnv) return fromEnv;
+
+  const targetUrl = baseUrl ?? getCurrentPlatform();
+  if (targetUrl) {
+    const fromConfig = loadPlatformBusinessDomain(targetUrl);
+    if (fromConfig) return fromConfig;
+  }
+  return "bd_public";
+}
