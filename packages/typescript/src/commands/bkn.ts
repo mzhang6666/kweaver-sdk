@@ -619,6 +619,57 @@ function parseJsonObject(text: string, errorMessage: string): Record<string, unk
   return parsed as Record<string, unknown>;
 }
 
+const MAX_OUTPUT_BYTES = 100_000;
+
+/**
+ * If a query response exceeds MAX_OUTPUT_BYTES, trim the datas array
+ * to fit, preserving valid JSON and the search_after cursor for pagination.
+ */
+function truncateQueryResult(raw: string): string {
+  if (raw.length <= MAX_OUTPUT_BYTES) {
+    return raw;
+  }
+
+  let parsed: { datas?: unknown[]; search_after?: unknown; [k: string]: unknown };
+  try {
+    parsed = JSON.parse(raw) as typeof parsed;
+  } catch {
+    return raw;
+  }
+
+  const datas = parsed.datas;
+  if (!Array.isArray(datas) || datas.length === 0) {
+    return raw;
+  }
+
+  const originalCount = datas.length;
+  while (datas.length > 1) {
+    datas.pop();
+    const candidate = JSON.stringify(parsed);
+    if (candidate.length <= MAX_OUTPUT_BYTES) {
+      parsed._truncated = {
+        returned: datas.length,
+        total_fetched: originalCount,
+        message: `Output exceeded ${Math.round(MAX_OUTPUT_BYTES / 1024)}KB. Use search_after to fetch remaining records.`,
+      };
+      console.error(
+        `[warn] Truncated ${originalCount} → ${datas.length} records (output exceeded ${Math.round(MAX_OUTPUT_BYTES / 1024)}KB). Use --search-after to paginate.`
+      );
+      return JSON.stringify(parsed);
+    }
+  }
+
+  parsed._truncated = {
+    returned: 1,
+    total_fetched: originalCount,
+    message: `Output exceeded ${Math.round(MAX_OUTPUT_BYTES / 1024)}KB. Use search_after with a smaller --limit.`,
+  };
+  console.error(
+    `[warn] Truncated ${originalCount} → 1 record (output exceeded ${Math.round(MAX_OUTPUT_BYTES / 1024)}KB). Use a smaller --limit.`
+  );
+  return JSON.stringify(parsed);
+}
+
 function parseSearchAfterArray(text: string): unknown[] {
   let parsed: unknown;
   try {
@@ -1231,13 +1282,7 @@ properties JSON format: {"_instance_identities":[{"<primary-key>":"<value>"}],"p
         body: options.body,
         businessDomain: options.businessDomain,
       });
-      const OUTPUT_WARN_BYTES = 100_000;
-      if (result.length > OUTPUT_WARN_BYTES) {
-        console.error(
-          `[warn] Response is ${(result.length / 1024).toFixed(0)}KB. Use a smaller --limit or --search-after to paginate.`
-        );
-      }
-      console.log(formatCallOutput(result, options.pretty));
+      console.log(formatCallOutput(truncateQueryResult(result), options.pretty));
       return 0;
     }
 
