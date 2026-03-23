@@ -169,7 +169,10 @@ function safeExit(code: number): void {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+import { fileURLToPath } from "node:url";
+import { resolve } from "node:path";
+
+if (fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   run(process.argv.slice(2))
     .then((code) => {
       safeExit(code);
