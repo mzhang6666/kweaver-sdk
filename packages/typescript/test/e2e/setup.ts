@@ -13,13 +13,14 @@
 import { readFileSync, existsSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { homedir } from "node:os";
+import { fileURLToPath } from "node:url";
 import { run } from "../../src/cli.js";
 import { setCurrentPlatform } from "../../src/config/store.js";
 import { normalizeBaseUrl } from "../../src/auth/oauth.js";
 
 /** Find repo root by walking up from this file looking for .git */
 function findRepoRoot(): string | null {
-  let dir = dirname(new URL(import.meta.url).pathname);
+  let dir = dirname(fileURLToPath(import.meta.url));
   for (let i = 0; i < 10; i += 1) {
     if (existsSync(join(dir, ".git"))) return dir;
     const parent = dirname(dir);
@@ -36,7 +37,7 @@ const GLOBAL_ENV_PATH = join(homedir(), ".env.secrets");
 function loadEnvFile(path: string): void {
   if (!existsSync(path)) return;
   const content = readFileSync(path, "utf-8");
-  for (const line of content.split("\n")) {
+  for (const line of content.split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#")) continue;
     const withoutExport = trimmed.replace(/^export\s+/, "");
