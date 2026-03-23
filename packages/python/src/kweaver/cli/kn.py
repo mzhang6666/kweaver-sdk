@@ -320,35 +320,78 @@ def _pack_bkn_directory_to_tar_bytes(abs_dir: Path) -> bytes:
 
 @kn_group.command("validate")
 @click.argument("directory")
+@click.option(
+    "--detect-encoding/--no-detect-encoding",
+    default=True,
+    show_default=True,
+    help="Detect .bkn encoding and normalize to UTF-8 (default: on).",
+)
+@click.option(
+    "--source-encoding",
+    default=None,
+    type=str,
+    help="Decode all .bkn files with this encoding (e.g. gb18030); overrides detection.",
+)
 @handle_errors
-def validate_bkn(directory: str) -> None:
+def validate_bkn(
+    directory: str,
+    detect_encoding: bool,
+    source_encoding: str | None,
+) -> None:
     """Validate a local BKN directory without uploading."""
     from bkn import load_network, validate_network_data
+
+    from kweaver.cli.bkn_encoding import prepare_bkn_directory_for_import
 
     dir_path = Path(directory).resolve()
     if not dir_path.is_dir():
         error_exit(f"Not a directory: {directory}")
 
-    network = load_network(str(dir_path))
-    result = validate_network_data(network)
-    if not result.ok:
-        for e in result.errors:
-            click.echo(f"  - {e}", err=True)
-        error_exit(f"BKN validation failed: {len(result.errors)} error(s)")
-
-    n_obj = len(network.all_objects)
-    n_rel = len(network.all_relations)
-    n_act = len(network.all_actions)
-    click.echo(
-        f"Valid: {n_obj} object types, {n_rel} relation types, {n_act} action types"
+    work_dir, cleanup = prepare_bkn_directory_for_import(
+        dir_path,
+        detect_encoding=detect_encoding,
+        source_encoding=source_encoding,
     )
+    try:
+        network = load_network(str(work_dir))
+        result = validate_network_data(network)
+        if not result.ok:
+            for e in result.errors:
+                click.echo(f"  - {e}", err=True)
+            error_exit(f"BKN validation failed: {len(result.errors)} error(s)")
+
+        n_obj = len(network.all_objects)
+        n_rel = len(network.all_relations)
+        n_act = len(network.all_actions)
+        click.echo(
+            f"Valid: {n_obj} object types, {n_rel} relation types, {n_act} action types"
+        )
+    finally:
+        cleanup()
 
 
 @kn_group.command("push")
 @click.argument("directory")
 @click.option("--branch", default="main", help="Branch name (default: main).")
+@click.option(
+    "--detect-encoding/--no-detect-encoding",
+    default=True,
+    show_default=True,
+    help="Detect .bkn encoding and normalize to UTF-8 (default: on).",
+)
+@click.option(
+    "--source-encoding",
+    default=None,
+    type=str,
+    help="Decode all .bkn files with this encoding (e.g. gb18030); overrides detection.",
+)
 @handle_errors
-def push_bkn(directory: str, branch: str) -> None:
+def push_bkn(
+    directory: str,
+    branch: str,
+    detect_encoding: bool,
+    source_encoding: str | None,
+) -> None:
     """Validate, generate checksum, pack, and upload a BKN directory.
 
     Uses **kweaver-bkn** for validation/checksum only; the upload archive is built with the
@@ -357,34 +400,44 @@ def push_bkn(directory: str, branch: str) -> None:
     """
     from bkn import generate_checksum_file, load_network
 
+    from kweaver.cli.bkn_encoding import prepare_bkn_directory_for_import
+
     dir_path = Path(directory).resolve()
     if not dir_path.is_dir():
         error_exit(f"Not a directory: {directory}")
 
-    network = load_network(str(dir_path))
-    n_obj = len(network.all_objects)
-    n_rel = len(network.all_relations)
-    n_act = len(network.all_actions)
-    click.echo(
-        f"Validated: {n_obj} object types, {n_rel} relation types, {n_act} action types",
-        err=True,
+    work_dir, cleanup = prepare_bkn_directory_for_import(
+        dir_path,
+        detect_encoding=detect_encoding,
+        source_encoding=source_encoding,
     )
+    try:
+        network = load_network(str(work_dir))
+        n_obj = len(network.all_objects)
+        n_rel = len(network.all_relations)
+        n_act = len(network.all_actions)
+        click.echo(
+            f"Validated: {n_obj} object types, {n_rel} relation types, {n_act} action types",
+            err=True,
+        )
 
-    generate_checksum_file(str(dir_path))
-    click.echo("Checksum generated", err=True)
+        generate_checksum_file(str(work_dir))
+        click.echo("Checksum generated", err=True)
 
-    tar_data = _pack_bkn_directory_to_tar_bytes(dir_path)
+        tar_data = _pack_bkn_directory_to_tar_bytes(work_dir)
 
-    client = make_client()
-    status, body = client._http.post_multipart(
-        "api/bkn-backend/v1/bkns",
-        files={"file": ("bkn.tar", tar_data, "application/octet-stream")},
-        params={"branch": branch},
-        timeout=60.0,
-    )
-    if status >= 400:
-        error_exit(f"HTTP {status}: {body.decode(errors='replace')}")
-    pp(json.loads(body.decode()))
+        client = make_client()
+        status, body = client._http.post_multipart(
+            "api/bkn-backend/v1/bkns",
+            files={"file": ("bkn.tar", tar_data, "application/octet-stream")},
+            params={"branch": branch},
+            timeout=60.0,
+        )
+        if status >= 400:
+            error_exit(f"HTTP {status}: {body.decode(errors='replace')}")
+        pp(json.loads(body.decode()))
+    finally:
+        cleanup()
 
 
 @kn_group.command("pull")

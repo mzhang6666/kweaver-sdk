@@ -42,6 +42,8 @@ test("parseKnPushArgs: parses directory and flags", () => {
   assert.equal(opts.directory, "my-bkn");
   assert.equal(opts.branch, "dev");
   assert.equal(opts.businessDomain, "bd_public");
+  assert.equal(opts.encodingOptions.detectEncoding, true);
+  assert.equal(opts.encodingOptions.sourceEncoding, null);
 });
 
 test("parseKnPushArgs: defaults", () => {
@@ -49,6 +51,13 @@ test("parseKnPushArgs: defaults", () => {
   assert.equal(opts.directory, ".");
   assert.equal(opts.branch, "main");
   assert.equal(opts.businessDomain, "bd_public");
+  assert.equal(opts.encodingOptions.detectEncoding, true);
+});
+
+test("parseKnPushArgs: encoding flags", () => {
+  const opts = parseKnPushArgs(["dir", "--no-detect-encoding", "--source-encoding", "gbk"]);
+  assert.equal(opts.encodingOptions.detectEncoding, false);
+  assert.equal(opts.encodingOptions.sourceEncoding, "gbk");
 });
 
 test("parseKnPushArgs: --help throws", () => {

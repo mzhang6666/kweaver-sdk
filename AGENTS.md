@@ -18,7 +18,7 @@
 | 仓库 / 包 | 职责 |
 |-----------|------|
 | **bkn-specification**（`@kweaver-ai/bkn` / `kweaver-bkn`） | BKN **格式**：解析、校验、目录加载、`CHECKSUM`、`pack_to_tar` 等到**磁盘**的 tar 等。**不要**在此实现 KWeaver 平台 HTTP（上传/下载 BKN）。 |
-| **kweaver-sdk**（`kweaver-sdk` npm / `kweaver-sdk` PyPI） | **平台客户端**：OAuth、KN/BKN 相关 REST、CLI。`bkn push` / `bkn pull` 等平台交互只放在本仓库；需要时用 **BKN SDK** 做本地校验/校验和，用本仓库的 HTTP 与系统 `tar` 完成打包上传。 |
+| **kweaver-sdk**（`kweaver-sdk` npm / `kweaver-sdk` PyPI） | **平台客户端**：OAuth、KN/BKN 相关 REST、CLI。`bkn push` / `bkn pull` 等平台交互只放在本仓库；需要时用 **BKN SDK** 做本地校验/校验和，用本仓库的 HTTP 与系统 `tar` 完成打包上传。`bkn validate` / `bkn push` 可在本仓库对 `.bkn` 做**编码检测与 UTF-8 规范化**（默认开启检测；`--no-detect-encoding` / `--source-encoding`），不替代 **bkn-specification** 的格式解析。 |
 
 ### BKN 规范
 

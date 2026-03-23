@@ -21,8 +21,10 @@ kweaver bkn create-from-ds <ds_id> --name <name> [--tables <t1,t2>] [--build/--n
 kweaver bkn update <kn_id> [--name <n>] [--description <d>] [--tag <t> ...]
 kweaver bkn build <kn_id> [--wait/--no-wait] [--timeout 300]
 kweaver bkn delete <kn_id> [--yes]
-kweaver bkn validate <directory>                        # 验证本地 BKN 目录（不上传）
-kweaver bkn push <directory> [--branch main]            # 上传 BKN 目录为 tar
+kweaver bkn validate <directory> [--detect-encoding/--no-detect-encoding] [--source-encoding <name>]
+kweaver bkn push <directory> [--branch main] [--detect-encoding/--no-detect-encoding] [--source-encoding <name>]
+# 规范上 .bkn 应为 UTF-8。默认会检测 .bkn 编码并规范为 UTF-8 再校验/打包；可用 --no-detect-encoding 要求严格 UTF-8；
+# 已知为 GBK/GB18030 等时可 --source-encoding gb18030（整目录统一）。检测置信度不足时会报错并提示指定编码。
 kweaver bkn pull <kn_id> [<directory>] [--branch main]  # 下载 BKN tar 并解压
 ```
 
