@@ -1,4 +1,7 @@
 import { createInterface } from "node:readline";
+import { statSync } from "node:fs";
+import { glob } from "node:fs/promises";
+import { resolve as resolvePath } from "node:path";
 import { ensureValidToken, formatHttpError, with401RefreshRetry } from "../auth/oauth.js";
 import {
   testDatasource,
@@ -11,6 +14,14 @@ import {
 } from "../api/datasources.js";
 import { formatCallOutput } from "./call.js";
 import { resolveBusinessDomain } from "../config/store.js";
+import {
+  parseCsvFile,
+  buildTableName,
+  splitBatches,
+  buildFieldMappings,
+  buildDagBody,
+} from "./import-csv.js";
+import { executeDataflow } from "../api/dataflow.js";
 
 function confirmYes(prompt: string): Promise<boolean> {
   return new Promise((resolve) => {
@@ -43,7 +54,9 @@ Subcommands:
   delete <id> [-y]                  Delete a datasource
   tables <id> [--keyword X]         List tables with columns
   connect <db_type> <host> <port> <database> --account X --password Y [--schema Z] [--name N]
-    Test connectivity, register datasource, and discover tables.`);
+    Test connectivity, register datasource, and discover tables.
+  import-csv <ds-id> --files <glob_or_list> [--table-prefix X] [--batch-size N]
+    Import CSV files into datasource tables via dataflow API.`);
     return 0;
   }
 
@@ -53,6 +66,7 @@ Subcommands:
     if (subcommand === "delete") return runDsDeleteCommand(rest);
     if (subcommand === "tables") return runDsTablesCommand(rest);
     if (subcommand === "connect") return runDsConnectCommand(rest);
+    if (subcommand === "import-csv") return runDsImportCsvCommand(rest);
     return Promise.resolve(-1);
   };
 
@@ -311,4 +325,248 @@ async function runDsConnectCommand(args: string[]): Promise<number> {
   };
   console.log(JSON.stringify(output, null, 2));
   return 0;
+}
+
+// ── import-csv ────────────────────────────────────────────────────────────────
+
+const IMPORT_CSV_HELP = `kweaver ds import-csv <ds-id> --files <glob_or_list> [options]
+
+Import CSV files into datasource tables via dataflow API.
+
+Options:
+  --files <s>          CSV file paths (comma-separated or glob pattern, required)
+  --table-prefix <s>   Table name prefix (default: none)
+  --batch-size <n>     Rows per batch (default: 500, range: 1-10000)
+  -bd, --biz-domain    Business domain (default: bd_public)`;
+
+export function parseImportCsvArgs(args: string[]): {
+  datasourceId: string;
+  files: string;
+  tablePrefix: string;
+  batchSize: number;
+  businessDomain: string;
+} {
+  let datasourceId = "";
+  let files = "";
+  let tablePrefix = "";
+  let batchSize = 500;
+  let businessDomain = "";
+
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === "--help" || arg === "-h") throw new Error("help");
+    if (arg === "--files" && args[i + 1]) {
+      files = args[++i];
+      continue;
+    }
+    if (arg === "--table-prefix" && args[i + 1]) {
+      tablePrefix = args[++i];
+      continue;
+    }
+    if (arg === "--batch-size" && args[i + 1]) {
+      const n = parseInt(args[++i], 10);
+      if (Number.isNaN(n) || n < 1 || n > 10000) {
+        throw new Error("--batch-size must be between 1 and 10000");
+      }
+      batchSize = n;
+      continue;
+    }
+    if ((arg === "-bd" || arg === "--biz-domain") && args[i + 1]) {
+      businessDomain = args[++i];
+      continue;
+    }
+    if (!arg.startsWith("-") && !datasourceId) {
+      datasourceId = arg;
+    }
+  }
+
+  if (!businessDomain) businessDomain = resolveBusinessDomain();
+  return { datasourceId, files, tablePrefix, batchSize, businessDomain };
+}
+
+export async function resolveFiles(pattern: string): Promise<string[]> {
+  const parts = pattern.split(",").map((p) => p.trim()).filter(Boolean);
+  const result: string[] = [];
+
+  for (const part of parts) {
+    if (part.includes("*") || part.includes("?")) {
+      const matched: string[] = [];
+      for await (const entry of glob(part)) {
+        const p = String(entry);
+        if (/\.csv$/i.test(p)) {
+          matched.push(resolvePath(p));
+        }
+      }
+      result.push(...matched);
+    } else {
+      const abs = resolvePath(part);
+      statSync(abs); // throws if file does not exist
+      result.push(abs);
+    }
+  }
+
+  if (result.length === 0) {
+    throw new Error(`No CSV files matched: ${pattern}`);
+  }
+
+  return result;
+}
+
+export interface ImportCsvResult {
+  code: number;
+  tables: string[]; // successfully imported table names
+  tableColumns: Record<string, string[]>; // tableName → column names
+  sampleRows: Record<string, Array<Record<string, string | null>>>; // tableName → first 100 rows
+}
+
+export async function runDsImportCsv(args: string[]): Promise<ImportCsvResult> {
+  let options: ReturnType<typeof parseImportCsvArgs>;
+  try {
+    options = parseImportCsvArgs(args);
+  } catch (error) {
+    if (error instanceof Error && error.message === "help") {
+      console.log(IMPORT_CSV_HELP);
+      return { code: 0, tables: [], tableColumns: {}, sampleRows: {} };
+    }
+    throw error;
+  }
+
+  if (!options.datasourceId) {
+    console.error("Usage: kweaver ds import-csv <ds-id> --files <glob_or_list> [options]");
+    return { code: 1, tables: [], tableColumns: {}, sampleRows: {} };
+  }
+  if (!options.files) {
+    console.error("Error: --files is required");
+    return { code: 1, tables: [], tableColumns: {}, sampleRows: {} };
+  }
+
+  // 1. Get credentials
+  const token = await ensureValidToken();
+  const base = { baseUrl: token.baseUrl, accessToken: token.accessToken };
+
+  // 2. Resolve glob / file list
+  const filePaths = await resolveFiles(options.files);
+
+  // 3. Get datasource type
+  const dsBody = await getDatasource({ ...base, id: options.datasourceId, businessDomain: options.businessDomain });
+  const dsData = JSON.parse(dsBody) as Record<string, unknown>;
+  const datasourceType =
+    String(dsData.type ?? dsData.ds_type ?? dsData.data_type ?? "mysql");
+
+  // Phase 1: Parse all CSV files upfront
+  interface ParsedFile {
+    filePath: string;
+    tableName: string;
+    headers: string[];
+    rows: Array<Record<string, string | null>>;
+  }
+  const parsed: ParsedFile[] = [];
+
+  for (const filePath of filePaths) {
+    const tableName = buildTableName(filePath, options.tablePrefix);
+    let csvData: Awaited<ReturnType<typeof parseCsvFile>>;
+    try {
+      csvData = await parseCsvFile(filePath);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error(`[${tableName}] skipping — parse error: ${msg}`);
+      continue;
+    }
+    if (csvData.headers.length === 0) {
+      console.error(`[${tableName}] skipping — no headers`);
+      continue;
+    }
+    if (csvData.rows.length === 0) {
+      console.error(`[${tableName}] skipping — no rows`);
+      continue;
+    }
+    parsed.push({ filePath, tableName, headers: csvData.headers, rows: csvData.rows });
+  }
+
+  if (parsed.length === 0) {
+    console.error("All files were skipped — nothing to import");
+    return { code: 1, tables: [], tableColumns: {}, sampleRows: {} };
+  }
+
+  // Phase 2: Import each file in batches
+  const succeeded: string[] = [];
+  const failed: string[] = [];
+  const tableColumns: Record<string, string[]> = {};
+  const sampleRows: Record<string, Array<Record<string, string | null>>> = {};
+
+  for (const { tableName, headers, rows } of parsed) {
+    const batches = splitBatches(rows, options.batchSize);
+    const fieldMappings = buildFieldMappings(headers);
+    let batchFailed = false;
+
+    for (let bIdx = 0; bIdx < batches.length; bIdx += 1) {
+      const batch = batches[bIdx];
+      const tableExist = bIdx > 0;
+      const batchLabel = `${bIdx + 1}/${batches.length}`;
+      const rowCount = batch.length;
+
+      const dagBody = buildDagBody({
+        datasourceId: options.datasourceId,
+        datasourceType,
+        tableName,
+        tableExist,
+        data: batch,
+        fieldMappings,
+      });
+
+      const t0 = Date.now();
+      process.stderr.write(`[${tableName}] batch ${batchLabel} (${rowCount} rows)... `);
+
+      try {
+        await executeDataflow({
+          ...base,
+          businessDomain: options.businessDomain,
+          body: dagBody,
+        });
+        const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+        process.stderr.write(`${elapsed}s\n`);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        process.stderr.write(`FAILED\n`);
+        console.error(`[${tableName}] batch ${batchLabel} error: ${msg}`);
+        batchFailed = true;
+        break;
+      }
+    }
+
+    if (batchFailed) {
+      failed.push(tableName);
+    } else {
+      succeeded.push(tableName);
+      tableColumns[tableName] = headers;
+      sampleRows[tableName] = parsed.find((p) => p.tableName === tableName)?.rows.slice(0, 100) ?? [];
+    }
+  }
+
+  // Summary
+  console.error(
+    `\nImport complete: ${succeeded.length} succeeded, ${failed.length} failed.`
+  );
+  if (failed.length > 0) {
+    console.error(`Failed tables: ${failed.join(", ")}`);
+  }
+
+  console.log(
+    JSON.stringify(
+      {
+        tables: succeeded,
+        failed,
+        summary: { succeeded: succeeded.length, failed: failed.length },
+      },
+      null,
+      2
+    )
+  );
+
+  return { code: failed.length > 0 ? 1 : 0, tables: succeeded, tableColumns, sampleRows };
+}
+
+export async function runDsImportCsvCommand(args: string[]): Promise<number> {
+  const result = await runDsImportCsv(args);
+  return result.code;
 }

@@ -23,19 +23,24 @@ export async function runAuthCommand(args: string[]): Promise<number> {
   const rest = args.slice(1);
 
   if (!target || target === "--help" || target === "-h") {
-    console.log(`kweaver auth login <url> [--alias <name>] [-u user] [-p pass] [--playwright]
-kweaver auth <url>           Login (shorthand; same options as login)
-kweaver auth status [url|alias]
-kweaver auth list            List saved platforms
-kweaver auth use <url|alias> Switch active platform
-kweaver auth logout [url|alias]   Logout (clear local token)
-kweaver auth delete <url|alias>   Delete saved credentials
+    console.log(`kweaver auth login <url> [options]   Login to a platform (browser OAuth2 by default)
+kweaver auth <url>                   Login (shorthand; same options as login)
+kweaver auth status [url|alias]      Show current auth status
+kweaver auth list                    List saved platforms
+kweaver auth use <url|alias>         Switch active platform
+kweaver auth logout [url|alias]      Logout (clear local token)
+kweaver auth delete <url|alias>      Delete saved credentials
 
-Login options (browser OAuth2 by default; use -u/-p for headless Playwright):
-  --alias <name>   Short name for this platform (use with auth use / status / logout)
-  -u, --username   Username (with -p triggers Playwright login)
-  -p, --password   Password
-  --playwright     Force browser (Playwright) login even without -u/-p`);
+Login options:
+  --alias <name>         Save platform with a short alias (use with use / status / logout)
+  --client-id <id>       Use an existing OAuth2 client ID instead of registering a new one.
+                         Use the platform's web app client ID to get the same permissions
+                         as the browser. Find it in DevTools: /oauth2/auth?client_id=<id>
+  --client-secret <s>    Client secret (omit for public/PKCE clients)
+  -u, --username         Username (with -p triggers Playwright headless login)
+  -p, --password         Password
+  --playwright           Force Playwright browser login even without -u/-p`);
+
     return 0;
   }
 
@@ -61,6 +66,8 @@ Login options (browser OAuth2 by default; use -u/-p for headless Playwright):
       const username = readOption(args, "--username") ?? readOption(args, "-u");
       const password = readOption(args, "--password") ?? readOption(args, "-p");
       const usePlaywright = args.includes("--playwright");
+      const clientId = readOption(args, "--client-id");
+      const clientSecret = readOption(args, "--client-secret");
 
       let token;
 
@@ -74,8 +81,12 @@ Login options (browser OAuth2 by default; use -u/-p for headless Playwright):
         token = await playwrightLogin(normalizedTarget);
       } else {
         // Default: OAuth2 authorization code flow (supports refresh_token)
-        console.log("Opening browser for OAuth2 login...");
-        token = await oauth2Login(normalizedTarget);
+        if (clientId) {
+          console.log(`Opening browser for OAuth2 login (client: ${clientId})...`);
+        } else {
+          console.log("Opening browser for OAuth2 login...");
+        }
+        token = await oauth2Login(normalizedTarget, { clientId: clientId ?? undefined, clientSecret: clientSecret ?? undefined });
       }
 
       if (alias) {

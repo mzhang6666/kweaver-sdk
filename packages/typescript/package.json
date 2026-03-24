@@ -67,6 +67,7 @@
     "@kweaver-ai/bkn": "^0.1.0",
     "@playwright/test": "^1.58.2",
     "chardet": "^2.1.1",
+    "csv-parse": "^6.2.1",
     "iconv-lite": "^0.7.2",
     "ink": "^6.8.0",
     "ink-spinner": "^5.0.0",

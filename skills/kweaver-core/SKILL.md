@@ -54,13 +54,19 @@ kweaver <command> [subcommand] [options]
 |--------|------|---------|---------|
 | `auth` | 认证管理 | `auth login <url> [--alias name]`（简写：`auth <url> [--alias …]`）；可选 `-u`/`-p` 或 `--playwright`；`auth use` / `status` / `logout` / `delete` 支持平台 URL 或别名 | `references/auth.md` |
 | `token` | 打印当前 access token（自动刷新） | `token` | — |
-| `bkn` | BKN 知识网络管理、Schema、查询、Action | `bkn validate`/`push` 默认检测 `.bkn` 编码并规范为 UTF-8，可用 `--no-detect-encoding` 或 `--source-encoding gb18030`；另有 `pull`、`object-type`、`search` 等，见 `references/bkn.md` | `references/bkn.md` |
-| `agent` | Agent CRUD、发布、对话 | `agent chat`、`agent sessions <agent_id>`、`agent history <conversation_id>`（会话 ID 来自 `sessions` 输出） | `references/agent.md` |
-| `ds` | 数据源管理 | `ds list`, `ds get <id>` | `references/ds.md` |
+| `bkn` | BKN 知识网络管理、Schema、查询、Action | `bkn validate`/`push` 默认检测 `.bkn` 编码并规范为 UTF-8，可用 `--no-detect-encoding` 或 `--source-encoding gb18030`；另有 `pull`、`object-type`、`search`、`create-from-ds`/`create-from-csv` 等，见 `references/bkn.md` | `references/bkn.md` |
+| `agent` | Agent CRUD、发布、对话 | `agent list`, `agent get <id>`, `agent chat <id> -m "..."`、`agent sessions <agent_id>`、`agent history <conversation_id>` | `references/agent.md` |
+| `ds` | 数据源管理 | `ds list`, `ds get <id>`, `ds import-csv <file> --name <name>` | `references/ds.md` |
 | `vega` | Vega 可观测平台 | `vega health`, `vega catalog list`, `vega resource list` | `references/vega.md` |
 | `config` | 平台配置（business domain 等） | `config show`, `config set-bd <uuid>` | `references/config.md` |
 | `context-loader` | MCP 分层检索 | `context-loader config show`, `context-loader kn-search <query>` | `references/context-loader.md` |
 | `call` | 通用 API 调用 | `call <url> [-X POST] [-d '...']`（可用 `curl` 别名；支持 `--url`、`--data-raw` 等，见 `kweaver --help`） | `references/call.md` |
+
+## 操作指南
+
+| 场景 | 说明 | 详细参考 |
+|------|------|---------|
+| 从数据库/CSV 构建 KN | 连接数据源 → CSV 导入 → 创建 KN → 构建索引 → 查询验证 → 绑定 Agent | [references/build-kn-from-db.md](references/build-kn-from-db.md) |
 
 **按需阅读**：需要子命令完整参数或编排示例时，读取对应的 reference 文件。
 
