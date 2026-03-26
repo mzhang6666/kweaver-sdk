@@ -83,6 +83,15 @@ kweaver auth login https://your-kweaver-instance.com --alias prod
 
 或使用环境变量：`KWEAVER_BASE_URL`、`KWEAVER_BUSINESS_DOMAIN`、`KWEAVER_TOKEN`。Node 版 `kweaver` CLI 的 TLS 说明见 [`packages/typescript/README.zh.md`](packages/typescript/README.zh.md) 中「环境变量」一节（含 `KWEAVER_TLS_INSECURE`、`NODE_TLS_REJECT_UNAUTHORIZED`）。
 
+### 无浏览器环境（SSH、CI、容器）
+
+**npm 版 `kweaver` CLI** 支持在无法打开浏览器的机器上完成登录：
+
+1. 在**有浏览器**的机器上执行 `kweaver auth login https://你的实例`。登录成功后，本地回调页会显示可复制的一行命令；也可执行 `kweaver auth export` 或 `kweaver auth export --json`。
+2. 在**无浏览器**的机器上执行该命令（含 `--client-id`、`--client-secret`、`--refresh-token`），会换取 token 并写入 `~/.kweaver/`，之后行为与正常登录一致。
+
+详见 [`packages/typescript/README.zh.md`](packages/typescript/README.zh.md) 中「无浏览器 / 服务器端认证」一节。Python 版 `kweaver` CLI 仍为浏览器交互登录；可将已在 Node CLI 下登录生成的 `~/.kweaver/` 目录拷贝到目标机复用。
+
 ## TypeScript SDK 用法
 
 ### 简洁 API（推荐）
@@ -190,7 +199,9 @@ result    = client.action_types.execute("bkn-id", "at-id", params={})
 ## 命令速查
 
 ```bash
-kweaver auth login <url> [--alias name] [-u user] [-p pass] [--playwright] [--insecure|-k] — 另有 status、list、use、delete、logout
+kweaver auth login <url> [--alias name] [-u user] [-p pass] [--playwright] [--insecure|-k]
+kweaver auth login <url> --client-id ID --client-secret S --refresh-token T   （无浏览器主机）
+kweaver auth export [url|alias] [--json]   auth status/list/use/delete/logout
 kweaver token
 kweaver ds list/get/delete/tables/connect
 kweaver dataview list/find/get/query/delete

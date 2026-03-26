@@ -83,6 +83,15 @@ kweaver auth login https://your-kweaver-instance.com --alias prod
 
 Or use environment variables: `KWEAVER_BASE_URL`, `KWEAVER_BUSINESS_DOMAIN`, `KWEAVER_TOKEN`. For TLS in the Node `kweaver` CLI, see `KWEAVER_TLS_INSECURE` and `NODE_TLS_REJECT_UNAUTHORIZED` in the [TypeScript README](packages/typescript/README.md#environment-variables).
 
+### Headless hosts (SSH, CI, containers — no browser)
+
+The **npm `kweaver` CLI** supports logging in on a machine that cannot open a browser:
+
+1. On any machine **with** a browser, run `kweaver auth login https://your-instance`. After success, the local callback page shows a one-line command you can copy (or run `kweaver auth export` / `kweaver auth export --json`).
+2. On the **headless** machine, run that command — it uses `--client-id`, `--client-secret`, and `--refresh-token` to exchange for tokens and save `~/.kweaver/` as usual.
+
+Details: [`packages/typescript/README.md`](packages/typescript/README.md) (section **Headless / Server Authentication**). The Python `kweaver` CLI still uses interactive browser login; you can reuse the same `~/.kweaver/` directory copied from a machine where the Node CLI completed login.
+
 ## TypeScript SDK Usage
 
 ### Simple API (recommended)
@@ -211,7 +220,9 @@ result = client.dataflows.execute(
 ## CLI Quick Reference
 
 ```bash
-kweaver auth login <url> [--alias name] [-u user] [-p pass] [--playwright] [--insecure|-k] — also: status, list, use, delete, logout
+kweaver auth login <url> [--alias name] [-u user] [-p pass] [--playwright] [--insecure|-k]
+kweaver auth login <url> --client-id ID --client-secret S --refresh-token T   (headless host)
+kweaver auth export [url|alias] [--json]   auth status/list/use/delete/logout
 kweaver token
 kweaver config show / set-bd <value>
 kweaver ds list/get/delete/tables/connect
