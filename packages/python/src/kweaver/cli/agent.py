@@ -117,3 +117,14 @@ def history(conversation_id: str, limit: int | None) -> None:
     client = make_client()
     messages = client.conversations.list_messages(conversation_id, limit=limit)
     pp([m.model_dump() for m in messages])
+
+
+@agent_group.command("trace")
+@click.argument("conversation_id")
+@click.option("--compact", is_flag=True, help="Compact JSON output.")
+@handle_errors
+def trace(conversation_id: str, compact: bool) -> None:
+    """Get trace data for a conversation."""
+    client = make_client()
+    data = client.conversations.get_traces_by_conversation(conversation_id)
+    pp(data, compact=compact)

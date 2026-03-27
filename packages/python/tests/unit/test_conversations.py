@@ -146,3 +146,28 @@ def test_list_messages_404_returns_empty():
     client = make_client(lambda r: httpx.Response(404, json={"message": "not found"}))
     msgs = client.conversations.list_messages("conv_01")
     assert msgs == []
+
+
+def test_get_traces_by_conversation(capture: RequestCapture):
+    """Get traces calls GET /api/agent-observability/v1/traces/by-conversation."""
+    def handler(req: httpx.Request) -> httpx.Response:
+        return httpx.Response(200, json={
+            "traces": [
+                {"span_id": "span_01", "name": "query", "start_time": "2026-03-12T10:00:00Z"},
+            ],
+        })
+
+    client = make_client(handler, capture)
+    data = client.conversations.get_traces_by_conversation("conv_01")
+    assert "traces" in data
+    assert len(data["traces"]) == 1
+    assert data["traces"][0]["span_id"] == "span_01"
+    assert "/api/agent-observability/v1/traces/by-conversation" in capture.last_url()
+    assert "conversation_id=conv_01" in capture.last_url()
+
+
+def test_get_traces_by_conversation_empty():
+    """Empty response returns empty dict."""
+    client = make_client(lambda r: httpx.Response(200, json={}))
+    data = client.conversations.get_traces_by_conversation("conv_01")
+    assert data == {}

@@ -71,9 +71,10 @@ def make_client(*, debug: bool = False, dry_run: bool = False) -> KWeaverClient:
     )
 
 
-def pp(data: Any) -> None:
+def pp(data: Any, *, compact: bool = False) -> None:
     """Pretty-print JSON data."""
-    click.echo(json.dumps(data, indent=2, ensure_ascii=False, default=str))
+    indent = None if compact else 2
+    click.echo(json.dumps(data, indent=indent, ensure_ascii=False, default=str))
 
 
 def error_exit(msg: str, code: int = 1) -> None:

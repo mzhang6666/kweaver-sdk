@@ -175,6 +175,19 @@ class ConversationsResource:
         items = _extract_list(data, "entries", "items", "messages", "list", "data")
         return [_parse_message_item(d) for d in items]
 
+    def get_traces_by_conversation(self, conversation_id: str) -> dict[str, Any]:
+        """Get trace data for a conversation.
+
+        Args:
+            conversation_id: The conversation ID to query traces for.
+
+        Returns:
+            Trace data as a dictionary.
+        """
+        path = "/api/agent-observability/v1/traces/by-conversation"
+        data = self._http.get(path, params={"conversation_id": conversation_id})
+        return data if isinstance(data, dict) else {}
+
 
 def _extract_list(data: Any, *keys: str) -> list[Any]:
     """Extract list from response dict or return data if already a list."""

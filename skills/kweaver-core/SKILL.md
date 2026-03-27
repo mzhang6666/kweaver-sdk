@@ -2,12 +2,12 @@
 name: kweaver-core
 description: >-
   操作 KWeaver 知识网络与 Decision Agent — 构建知识网络、查询 Schema/实例、
-  语义搜索、执行 Action、Agent CRUD 与对话。
+  语义搜索、执行 Action、Agent CRUD 与对话、Trace 数据分析。
   操作 Vega 可观测平台 — 查询 Catalog/资源/连接器类型、健康巡检。
   当用户提到"知识网络"、"知识图谱"、"查询对象类"、
   "执行 Action"、"有哪些 Agent"、"创建 Agent"、"跟 Agent 对话"、
   "数据源"、"数据视图"、"原子视图"、"Catalog"、"Vega"、
-  "健康检查"、"巡检"等意图时自动使用。
+  "健康检查"、"巡检"、"trace"、"证据链"、"数据流追踪"、"数据来源"、"数据怎么得到的"等意图时自动使用。
 allowed-tools: Bash(kweaver *), Bash(npx kweaver *)
 argument-hint: [自然语言指令]
 ---
@@ -61,7 +61,7 @@ kweaver <command> [subcommand] [options]
 | `token` | 打印当前 access token（自动刷新） | `token` | — |
 | `config` | **平台业务域（优先于多数 bkn/agent/ds 操作）** | `config show`, `config list-bd`, `config set-bd <uuid>` | `references/config.md` |
 | `bkn` | BKN 知识网络管理、Schema、查询、Action | `bkn validate`/`push` 默认检测 `.bkn` 编码并规范为 UTF-8，可用 `--no-detect-encoding` 或 `--source-encoding gb18030`；另有 `pull`、`object-type`、`search`、`create-from-ds`/`create-from-csv` 等，见 `references/bkn.md` | `references/bkn.md` |
-| `agent` | Agent CRUD、发布、对话 | `agent list`, `agent get <id>`, `agent chat <id> -m "..."`、`agent sessions <agent_id>`、`agent history <conversation_id>` | `references/agent.md` |
+| `agent` | Agent CRUD、发布、对话、Trace | `agent list`, `agent get <id>`, `agent chat <id> -m "..."`、`agent sessions <agent_id>`、`agent history <conversation_id>`、`agent trace <conversation_id>` | `references/agent.md` |
 | `ds` | 数据源管理 | `ds list`, `ds get <id>`, `ds import-csv <file> --name <name>` | `references/ds.md` |
 | `dataview` | 原子/自定义数据视图（mdl-data-model） | `dataview list`、`find --name`、`get`、`query`（SQL / mdl-uniquery）、`delete` | `references/dataview.md` |
 | `vega` | Vega 可观测平台 | `vega health`, `vega catalog list`, `vega resource list` | `references/vega.md` |
@@ -75,6 +75,7 @@ kweaver <command> [subcommand] [options]
 | 登录后确认业务域 | `config show`；若异常或列表为空 → `config list-bd` → `config set-bd <uuid>` | [references/config.md](references/config.md) |
 | 从数据库/CSV 构建 KN | 连接数据源 → CSV 导入 → 创建 KN → 构建索引 → 查询验证 → 绑定 Agent | [references/build-kn-from-db.md](references/build-kn-from-db.md) |
 | 列/查数据视图 | `list` 浏览；`find --name` 按名搜索（`--exact`/`--wait`）；`query` 对视图跑 SQL | [references/dataview.md](references/dataview.md) |
+| Trace 数据分析 | `agent trace <conversation_id>` 获取 trace 数据，构建证据链 | — |
 
 **按需阅读**：需要子命令完整参数或编排示例时，读取对应的 reference 文件。
 
