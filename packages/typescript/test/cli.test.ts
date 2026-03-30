@@ -1362,3 +1362,434 @@ test("ensureValidToken strips Bearer prefix from KWEAVER_TOKEN env var", async (
     delete process.env.KWEAVER_BASE_URL;
   }
 });
+
+// ---------------------------------------------------------------------------
+// Vega CLI command tests
+// ---------------------------------------------------------------------------
+
+test("run vega shows subcommand help", async () => {
+  assert.equal(await run(["vega"]), 0);
+});
+
+test("run vega --help shows all subcommands", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("catalog list"));
+    assert.ok(help.includes("catalog create"));
+    assert.ok(help.includes("catalog update"));
+    assert.ok(help.includes("catalog delete"));
+    assert.ok(help.includes("resource list"));
+    assert.ok(help.includes("resource create"));
+    assert.ok(help.includes("resource update"));
+    assert.ok(help.includes("resource delete"));
+    assert.ok(help.includes("connector-type list"));
+    assert.ok(help.includes("connector-type register"));
+    assert.ok(help.includes("connector-type update"));
+    assert.ok(help.includes("connector-type delete"));
+    assert.ok(help.includes("connector-type enable"));
+    assert.ok(help.includes("discovery-task list"));
+    assert.ok(help.includes("discovery-task get"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+// -- catalog subcommands --
+
+test("run vega catalog --help shows CRUD subcommands", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "catalog", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("create"));
+    assert.ok(help.includes("update"));
+    assert.ok(help.includes("delete"));
+    assert.ok(help.includes("list"));
+    assert.ok(help.includes("get"));
+    assert.ok(help.includes("health"));
+    assert.ok(help.includes("test-connection"));
+    assert.ok(help.includes("discover"));
+    assert.ok(help.includes("resources"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega catalog create --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "catalog", "create", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("--name"));
+    assert.ok(help.includes("--connector-type"));
+    assert.ok(help.includes("--connector-config"));
+    assert.ok(help.includes("--tags"));
+    assert.ok(help.includes("--description"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega catalog create without required args exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "catalog", "create"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega catalog update --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "catalog", "update", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("--name"));
+    assert.ok(help.includes("--connector-type"));
+    assert.ok(help.includes("--tags"));
+    assert.ok(help.includes("--description"));
+    assert.ok(help.includes("--connector-config"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega catalog update without id exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "catalog", "update"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega catalog delete --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "catalog", "delete", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("-y"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega catalog delete without ids exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "catalog", "delete"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+// -- resource subcommands --
+
+test("run vega resource --help shows CRUD subcommands", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "resource", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("create"));
+    assert.ok(help.includes("update"));
+    assert.ok(help.includes("delete"));
+    assert.ok(help.includes("list"));
+    assert.ok(help.includes("get"));
+    assert.ok(help.includes("query"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega resource create --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "resource", "create", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("--catalog-id"));
+    assert.ok(help.includes("--name"));
+    assert.ok(help.includes("--category"));
+    assert.ok(help.includes("--source-identifier"));
+    assert.ok(help.includes("--database"));
+    assert.ok(help.includes("-d"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega resource create without required args exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "resource", "create"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega resource update --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "resource", "update", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("--name"));
+    assert.ok(help.includes("--status"));
+    assert.ok(help.includes("--tags"));
+    assert.ok(help.includes("-d"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega resource update without id exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "resource", "update"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega resource delete --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "resource", "delete", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("-y"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega resource delete without ids exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "resource", "delete"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+// -- connector-type subcommands --
+
+test("run vega connector-type --help shows CRUD subcommands", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("list"));
+    assert.ok(help.includes("get"));
+    assert.ok(help.includes("register"));
+    assert.ok(help.includes("update"));
+    assert.ok(help.includes("delete"));
+    assert.ok(help.includes("enable"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega connector-type register --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "register", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("-d"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega connector-type register without data exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "register"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega connector-type update --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "update", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("-d"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega connector-type update without args exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "update"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega connector-type delete --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "delete", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("-y"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega connector-type delete without type exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "delete"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega connector-type enable --help shows usage", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "enable", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("--enabled"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega connector-type enable without args exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "connector-type", "enable"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+// -- discovery-task subcommands --
+
+test("run vega discovery-task --help shows subcommands", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "discovery-task", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("list"));
+    assert.ok(help.includes("get"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega discovery-task list --help shows options", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "discovery-task", "list", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("--status"));
+    assert.ok(help.includes("--limit"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega discovery-task get --help shows usage", async () => {
+  const lines: string[] = [];
+  const originalLog = console.log;
+  console.log = (...args: unknown[]) => { lines.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "discovery-task", "get", "--help"]), 0);
+    const help = lines.join("\n");
+    assert.ok(help.includes("discovery-task get"));
+  } finally {
+    console.log = originalLog;
+  }
+});
+
+test("run vega discovery-task get without id exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "discovery-task", "get"]), 1);
+    assert.ok(errors.join("\n").includes("Usage:"));
+  } finally {
+    console.error = originalErr;
+  }
+});
+
+test("run vega unknown-subcommand exits 1", async () => {
+  const errors: string[] = [];
+  const originalErr = console.error;
+  console.error = (...args: unknown[]) => { errors.push(args.map(String).join(" ")); };
+  try {
+    assert.equal(await run(["vega", "nonexistent"]), 1);
+    assert.ok(errors.join("\n").includes("Unknown"));
+  } finally {
+    console.error = originalErr;
+  }
+});

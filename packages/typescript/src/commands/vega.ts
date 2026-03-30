@@ -1,8 +1,12 @@
+import { createInterface } from "node:readline";
 import { ensureValidToken, formatHttpError, with401RefreshRetry } from "../auth/oauth.js";
 import {
   vegaHealth,
   listVegaCatalogs,
   getVegaCatalog,
+  createVegaCatalog,
+  updateVegaCatalog,
+  deleteVegaCatalogs,
   vegaCatalogHealthStatus,
   testVegaCatalogConnection,
   discoverVegaCatalog,
@@ -10,9 +14,17 @@ import {
   listVegaResources,
   getVegaResource,
   queryVegaResourceData,
+  createVegaResource,
+  updateVegaResource,
+  deleteVegaResources,
   listVegaConnectorTypes,
   getVegaConnectorType,
+  registerVegaConnectorType,
+  updateVegaConnectorType,
+  deleteVegaConnectorType,
+  setVegaConnectorTypeEnabled,
   listVegaDiscoverTasks,
+  getVegaDiscoverTask,
 } from "../api/vega.js";
 import { formatCallOutput } from "./call.js";
 import { resolveBusinessDomain } from "../config/store.js";
@@ -34,11 +46,23 @@ Subcommands:
   catalog test-connection <id>        Test catalog connectivity
   catalog discover <id> [--wait]      Trigger discovery
   catalog resources <id> [--category X] [--limit N]
+  catalog create --name <n> --connector-type <t> --connector-config <json>
+  catalog update <id> [--name X] [--connector-type X] [--tags X] [--description X]
+  catalog delete <ids...> [-y]
   resource list [--catalog-id X] [--category X] [--status X] [--limit N] [--offset N]
   resource get <id>
   resource query <id> -d <json-body>  Query resource data
+  resource create --catalog-id <cid> --name <n> --category <cat>
+  resource update <id> [--name X] [--status X] [--tags X] [-d json]
+  resource delete <ids...> [-y]
   connector-type list                 List connector types
   connector-type get <type>           Get connector type details
+  connector-type register -d <json>   Register a new connector type
+  connector-type update <type> -d <json>  Update connector type
+  connector-type delete <type> [-y]   Delete connector type
+  connector-type enable <type> --enabled <bool>  Enable/disable connector type
+  discovery-task list [--status X] [--limit N]
+  discovery-task get <id>
 
 Common flags:
   -bd, --biz-domain <s>   Business domain (default: bd_public)
@@ -75,6 +99,17 @@ function parseCommonFlags(args: string[]): {
   return { remaining, businessDomain, pretty };
 }
 
+function confirmYes(prompt: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const rl = createInterface({ input: process.stdin, output: process.stdout });
+    rl.question(`${prompt} [y/N] `, (answer) => {
+      rl.close();
+      const trimmed = answer.trim().toLowerCase();
+      resolve(trimmed === "y" || trimmed === "yes");
+    });
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Main router
 // ---------------------------------------------------------------------------
@@ -94,6 +129,7 @@ export async function runVegaCommand(args: string[]): Promise<number> {
     if (subcommand === "catalog") return runVegaCatalogCommand(rest);
     if (subcommand === "resource") return runVegaResourceCommand(rest);
     if (subcommand === "connector-type") return runVegaConnectorTypeCommand(rest);
+    if (subcommand === "discovery-task") return runVegaDiscoveryTaskCommand(rest);
     return Promise.resolve(-1);
   };
 
@@ -228,7 +264,10 @@ Subcommands:
   health <ids...> | --all
   test-connection <id>
   discover <id> [--wait]
-  resources <id> [--category X] [--limit N]`);
+  resources <id> [--category X] [--limit N]
+  create --name <name> --connector-type <type> --connector-config <json> [--tags t1,t2] [--description X]
+  update <id> [--name X] [--connector-type X] [--tags X] [--description X] [--connector-config X]
+  delete <ids...> [-y]`);
     return 0;
   }
 
@@ -238,6 +277,9 @@ Subcommands:
   if (sub === "test-connection") return await runCatalogTestConnection(rest);
   if (sub === "discover") return await runCatalogDiscover(rest);
   if (sub === "resources") return await runCatalogResources(rest);
+  if (sub === "create") return await runCatalogCreate(rest);
+  if (sub === "update") return await runCatalogUpdate(rest);
+  if (sub === "delete") return await runCatalogDelete(rest);
 
   console.error(`Unknown catalog subcommand: ${sub}`);
   return 1;
@@ -482,6 +524,206 @@ Options:
 }
 
 // ---------------------------------------------------------------------------
+// catalog create
+// ---------------------------------------------------------------------------
+
+async function runCatalogCreate(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega catalog create [options]
+
+Options:
+  --name <s>              Catalog name (required)
+  --connector-type <s>    Connector type (required)
+  --connector-config <j>  Connector config JSON (required)
+  --tags <t1,t2>          Comma-separated tags
+  --description <s>       Description`);
+    return 0;
+  }
+
+  let name: string | undefined;
+  let connectorType: string | undefined;
+  let connectorConfig: string | undefined;
+  let tags: string | undefined;
+  let description: string | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if (arg === "--name" && remaining[i + 1]) {
+      name = remaining[++i];
+      continue;
+    }
+    if (arg === "--connector-type" && remaining[i + 1]) {
+      connectorType = remaining[++i];
+      continue;
+    }
+    if (arg === "--connector-config" && remaining[i + 1]) {
+      connectorConfig = remaining[++i];
+      continue;
+    }
+    if (arg === "--tags" && remaining[i + 1]) {
+      tags = remaining[++i];
+      continue;
+    }
+    if (arg === "--description" && remaining[i + 1]) {
+      description = remaining[++i];
+      continue;
+    }
+  }
+
+  if (!name || !connectorType || !connectorConfig) {
+    console.error("Usage: kweaver vega catalog create --name <name> --connector-type <type> --connector-config <json>");
+    return 1;
+  }
+
+  const payload: Record<string, unknown> = {
+    name,
+    connector_type: connectorType,
+    connector_config: JSON.parse(connectorConfig),
+  };
+  if (tags) payload.tags = tags.split(",");
+  if (description) payload.description = description;
+
+  const token = await ensureValidToken();
+  const body = await createVegaCatalog({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    body: JSON.stringify(payload),
+    businessDomain,
+  });
+  console.log(formatCallOutput(body, pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// catalog update
+// ---------------------------------------------------------------------------
+
+async function runCatalogUpdate(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega catalog update <id> [options]
+
+Options:
+  --name <s>              New name
+  --connector-type <t>    Connector type (e.g. mysql, opensearch)
+  --tags <t1,t2>          Comma-separated tags
+  --description <s>       Description
+  --connector-config <j>  Connector config JSON`);
+    return 0;
+  }
+
+  let name: string | undefined;
+  let connectorType: string | undefined;
+  let tags: string | undefined;
+  let description: string | undefined;
+  let connectorConfig: string | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  const positionals: string[] = [];
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if (arg === "--name" && remaining[i + 1]) {
+      name = remaining[++i];
+      continue;
+    }
+    if (arg === "--connector-type" && remaining[i + 1]) {
+      connectorType = remaining[++i];
+      continue;
+    }
+    if (arg === "--tags" && remaining[i + 1]) {
+      tags = remaining[++i];
+      continue;
+    }
+    if (arg === "--description" && remaining[i + 1]) {
+      description = remaining[++i];
+      continue;
+    }
+    if (arg === "--connector-config" && remaining[i + 1]) {
+      connectorConfig = remaining[++i];
+      continue;
+    }
+    if (!arg.startsWith("-")) {
+      positionals.push(arg);
+    }
+  }
+
+  const id = positionals[0];
+  if (!id) {
+    console.error("Usage: kweaver vega catalog update <id> [--name X] [--connector-type X] [--tags X] [--description X] [--connector-config X]");
+    return 1;
+  }
+
+  const payload: Record<string, unknown> = {};
+  if (name) payload.name = name;
+  if (connectorType) payload.connector_type = connectorType;
+  if (tags) payload.tags = tags.split(",");
+  if (description) payload.description = description;
+  if (connectorConfig) payload.connector_config = JSON.parse(connectorConfig);
+
+  const token = await ensureValidToken();
+  const body = await updateVegaCatalog({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    id,
+    body: JSON.stringify(payload),
+    businessDomain,
+  });
+  console.log(formatCallOutput(body || "{}", pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// catalog delete
+// ---------------------------------------------------------------------------
+
+async function runCatalogDelete(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega catalog delete <ids...> [-y]
+
+Options:
+  -y, --yes   Skip confirmation`);
+    return 0;
+  }
+
+  let skipConfirm = false;
+  const { remaining, businessDomain } = parseCommonFlags(args);
+
+  const positionals: string[] = [];
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if (arg === "-y" || arg === "--yes") {
+      skipConfirm = true;
+      continue;
+    }
+    if (!arg.startsWith("-")) {
+      positionals.push(arg);
+    }
+  }
+
+  if (positionals.length === 0) {
+    console.error("Usage: kweaver vega catalog delete <ids...> [-y]");
+    return 1;
+  }
+
+  const ids = positionals.join(",");
+
+  if (!skipConfirm) {
+    const ok = await confirmYes(`Delete catalog(s) ${ids}?`);
+    if (!ok) { console.error("Aborted."); return 1; }
+  }
+
+  const token = await ensureValidToken();
+  await deleteVegaCatalogs({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    ids,
+    businessDomain,
+  });
+  console.error(`Deleted ${ids}`);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Resource router
 // ---------------------------------------------------------------------------
 
@@ -494,13 +736,19 @@ async function runVegaResourceCommand(args: string[]): Promise<number> {
 Subcommands:
   list [--catalog-id X] [--category X] [--status X] [--limit N] [--offset N]
   get <id>
-  query <id> -d <json-body>`);
+  query <id> -d <json-body>
+  create --catalog-id <cid> --name <name> --category <cat>
+  update <id> [--name X] [--status X] [--tags X] [-d json]
+  delete <ids...> [-y]`);
     return 0;
   }
 
   if (sub === "list") return await runResourceList(rest);
   if (sub === "get") return await runResourceGet(rest);
   if (sub === "query") return await runResourceQuery(rest);
+  if (sub === "create") return await runResourceCreate(rest);
+  if (sub === "update") return await runResourceUpdate(rest);
+  if (sub === "delete") return await runResourceDelete(rest);
 
   console.error(`Unknown resource subcommand: ${sub}`);
   return 1;
@@ -646,6 +894,163 @@ Options:
 }
 
 // ---------------------------------------------------------------------------
+// resource create
+// ---------------------------------------------------------------------------
+
+async function runResourceCreate(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega resource create [options]
+
+Options:
+  --catalog-id <cid>          Catalog ID (required)
+  --name <name>               Resource name (required)
+  --category <cat>            Category (required)
+  --source-identifier <si>    Source identifier
+  --database <db>             Database name
+  -d, --data <json>           Additional fields as JSON`);
+    return 0;
+  }
+
+  let catalogId: string | undefined;
+  let name: string | undefined;
+  let category: string | undefined;
+  let sourceIdentifier: string | undefined;
+  let database: string | undefined;
+  let data: string | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if (arg === "--catalog-id" && remaining[i + 1]) { catalogId = remaining[++i]; continue; }
+    if (arg === "--name" && remaining[i + 1]) { name = remaining[++i]; continue; }
+    if (arg === "--category" && remaining[i + 1]) { category = remaining[++i]; continue; }
+    if (arg === "--source-identifier" && remaining[i + 1]) { sourceIdentifier = remaining[++i]; continue; }
+    if (arg === "--database" && remaining[i + 1]) { database = remaining[++i]; continue; }
+    if ((arg === "-d" || arg === "--data") && remaining[i + 1]) { data = remaining[++i]; continue; }
+  }
+
+  if (!catalogId || !name || !category) {
+    console.error("Usage: kweaver vega resource create --catalog-id <cid> --name <name> --category <cat>");
+    return 1;
+  }
+
+  const payload: Record<string, unknown> = { catalog_id: catalogId, name, category };
+  if (sourceIdentifier) payload.source_identifier = sourceIdentifier;
+  if (database) payload.database = database;
+  if (data) Object.assign(payload, JSON.parse(data));
+
+  const token = await ensureValidToken();
+  const body = await createVegaResource({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    body: JSON.stringify(payload),
+    businessDomain,
+  });
+  console.log(formatCallOutput(body, pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// resource update
+// ---------------------------------------------------------------------------
+
+async function runResourceUpdate(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega resource update <id> [options]
+
+Options:
+  --name <name>       Resource name
+  --status <s>        Status
+  --tags <t1,t2>      Comma-separated tags
+  -d, --data <json>   Additional fields as JSON`);
+    return 0;
+  }
+
+  let name: string | undefined;
+  let status: string | undefined;
+  let tags: string | undefined;
+  let data: string | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  const positionals: string[] = [];
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if (arg === "--name" && remaining[i + 1]) { name = remaining[++i]; continue; }
+    if (arg === "--status" && remaining[i + 1]) { status = remaining[++i]; continue; }
+    if (arg === "--tags" && remaining[i + 1]) { tags = remaining[++i]; continue; }
+    if ((arg === "-d" || arg === "--data") && remaining[i + 1]) { data = remaining[++i]; continue; }
+    if (!arg.startsWith("-")) positionals.push(arg);
+  }
+
+  const id = positionals[0];
+  if (!id) {
+    console.error("Usage: kweaver vega resource update <id> [--name X] [--status X] [--tags X] [-d json]");
+    return 1;
+  }
+
+  const payload: Record<string, unknown> = {};
+  if (name) payload.name = name;
+  if (status) payload.status = status;
+  if (tags) payload.tags = tags.split(",");
+  if (data) Object.assign(payload, JSON.parse(data));
+
+  const token = await ensureValidToken();
+  const body = await updateVegaResource({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    id,
+    body: JSON.stringify(payload),
+    businessDomain,
+  });
+  console.log(formatCallOutput(body || "{}", pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// resource delete
+// ---------------------------------------------------------------------------
+
+async function runResourceDelete(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega resource delete <ids...> [-y]
+
+Options:
+  -y, --yes   Skip confirmation prompt`);
+    return 0;
+  }
+
+  let yes = false;
+  const { remaining, businessDomain } = parseCommonFlags(args);
+  const positionals: string[] = [];
+
+  for (const arg of remaining) {
+    if (arg === "-y" || arg === "--yes") { yes = true; continue; }
+    if (!arg.startsWith("-")) positionals.push(arg);
+  }
+
+  if (positionals.length === 0) {
+    console.error("Usage: kweaver vega resource delete <ids...> [-y]");
+    return 1;
+  }
+
+  const ids = positionals.join(",");
+  if (!yes) {
+    const confirmed = await confirmYes(`Delete resource(s) ${ids}?`);
+    if (!confirmed) { console.error("Aborted."); return 1; }
+  }
+
+  const token = await ensureValidToken();
+  await deleteVegaResources({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    ids,
+    businessDomain,
+  });
+  console.error(`Deleted ${ids}`);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
 // Connector-type router
 // ---------------------------------------------------------------------------
 
@@ -656,13 +1061,21 @@ async function runVegaConnectorTypeCommand(args: string[]): Promise<number> {
     console.log(`kweaver vega connector-type
 
 Subcommands:
-  list              List connector types
-  get <type>        Get connector type details`);
+  list                            List connector types
+  get <type>                      Get connector type details
+  register -d <json>              Register a new connector type
+  update <type> -d <json>         Update connector type
+  delete <type> [-y]              Delete connector type
+  enable <type> --enabled <bool>  Enable/disable connector type`);
     return 0;
   }
 
   if (sub === "list") return await runConnectorTypeList(rest);
   if (sub === "get") return await runConnectorTypeGet(rest);
+  if (sub === "register") return await runConnectorTypeRegister(rest);
+  if (sub === "update") return await runConnectorTypeUpdate(rest);
+  if (sub === "delete") return await runConnectorTypeDelete(rest);
+  if (sub === "enable") return await runConnectorTypeEnable(rest);
 
   console.error(`Unknown connector-type subcommand: ${sub}`);
   return 1;
@@ -711,6 +1124,258 @@ async function runConnectorTypeGet(args: string[]): Promise<number> {
     baseUrl: token.baseUrl,
     accessToken: token.accessToken,
     type,
+    businessDomain,
+  });
+  console.log(formatCallOutput(body, pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// connector-type register
+// ---------------------------------------------------------------------------
+
+async function runConnectorTypeRegister(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega connector-type register -d <json>
+
+Options:
+  -d, --data <json>   Connector type definition (JSON string)`);
+    return 0;
+  }
+
+  let data: string | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if ((arg === "-d" || arg === "--data") && remaining[i + 1]) { data = remaining[++i]; continue; }
+  }
+
+  if (!data) {
+    console.error("Usage: kweaver vega connector-type register -d <json>");
+    return 1;
+  }
+
+  const token = await ensureValidToken();
+  const body = await registerVegaConnectorType({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    body: data,
+    businessDomain,
+  });
+  console.log(formatCallOutput(body, pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// connector-type update
+// ---------------------------------------------------------------------------
+
+async function runConnectorTypeUpdate(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega connector-type update <type> -d <json>
+
+Options:
+  -d, --data <json>   Updated fields (JSON string)`);
+    return 0;
+  }
+
+  let data: string | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  const positionals: string[] = [];
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if ((arg === "-d" || arg === "--data") && remaining[i + 1]) { data = remaining[++i]; continue; }
+    if (!arg.startsWith("-")) positionals.push(arg);
+  }
+
+  const type = positionals[0];
+  if (!type || !data) {
+    console.error("Usage: kweaver vega connector-type update <type> -d <json>");
+    return 1;
+  }
+
+  const token = await ensureValidToken();
+  const body = await updateVegaConnectorType({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    type,
+    body: data,
+    businessDomain,
+  });
+  console.log(formatCallOutput(body || "{}", pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// connector-type delete
+// ---------------------------------------------------------------------------
+
+async function runConnectorTypeDelete(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega connector-type delete <type> [-y]
+
+Options:
+  -y, --yes   Skip confirmation prompt`);
+    return 0;
+  }
+
+  let yes = false;
+  const { remaining, businessDomain } = parseCommonFlags(args);
+  const positionals: string[] = [];
+
+  for (const arg of remaining) {
+    if (arg === "-y" || arg === "--yes") { yes = true; continue; }
+    if (!arg.startsWith("-")) positionals.push(arg);
+  }
+
+  const type = positionals[0];
+  if (!type) {
+    console.error("Usage: kweaver vega connector-type delete <type> [-y]");
+    return 1;
+  }
+
+  if (!yes) {
+    const confirmed = await confirmYes(`Delete connector type "${type}"?`);
+    if (!confirmed) { console.error("Aborted."); return 1; }
+  }
+
+  const token = await ensureValidToken();
+  await deleteVegaConnectorType({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    type,
+    businessDomain,
+  });
+  console.error(`Deleted ${type}`);
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// connector-type enable
+// ---------------------------------------------------------------------------
+
+async function runConnectorTypeEnable(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega connector-type enable <type> --enabled <true|false>`);
+    return 0;
+  }
+
+  let enabled: boolean | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  const positionals: string[] = [];
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if (arg === "--enabled" && remaining[i + 1]) {
+      enabled = remaining[++i] === "true";
+      continue;
+    }
+    if (!arg.startsWith("-")) positionals.push(arg);
+  }
+
+  const type = positionals[0];
+  if (!type || enabled === undefined) {
+    console.error("Usage: kweaver vega connector-type enable <type> --enabled <true|false>");
+    return 1;
+  }
+
+  const token = await ensureValidToken();
+  const body = await setVegaConnectorTypeEnabled({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    type,
+    enabled,
+    businessDomain,
+  });
+  console.log(formatCallOutput(body || "{}", pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// Discovery-task router
+// ---------------------------------------------------------------------------
+
+async function runVegaDiscoveryTaskCommand(args: string[]): Promise<number> {
+  const [sub, ...rest] = args;
+
+  if (!sub || sub === "--help" || sub === "-h") {
+    console.log(`kweaver vega discovery-task
+
+Subcommands:
+  list [--status X] [--limit N]
+  get <id>`);
+    return 0;
+  }
+
+  if (sub === "list") return await runDiscoveryTaskList(rest);
+  if (sub === "get") return await runDiscoveryTaskGet(rest);
+
+  console.error(`Unknown discovery-task subcommand: ${sub}`);
+  return 1;
+}
+
+// ---------------------------------------------------------------------------
+// discovery-task list
+// ---------------------------------------------------------------------------
+
+async function runDiscoveryTaskList(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log(`kweaver vega discovery-task list [options]
+
+Options:
+  --catalog-id <cid>  Filter by catalog (reserved)
+  --status <s>        Filter by status
+  --limit <n>         Max results`);
+    return 0;
+  }
+
+  let status: string | undefined;
+  let limit: number | undefined;
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+
+  for (let i = 0; i < remaining.length; i += 1) {
+    const arg = remaining[i];
+    if (arg === "--status" && remaining[i + 1]) { status = remaining[++i]; continue; }
+    if (arg === "--limit" && remaining[i + 1]) { limit = parseInt(remaining[++i], 10); continue; }
+    if (arg === "--catalog-id" && remaining[i + 1]) { remaining[++i]; continue; }
+  }
+
+  const token = await ensureValidToken();
+  const body = await listVegaDiscoverTasks({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    status,
+    limit,
+    businessDomain,
+  });
+  console.log(formatCallOutput(body, pretty));
+  return 0;
+}
+
+// ---------------------------------------------------------------------------
+// discovery-task get
+// ---------------------------------------------------------------------------
+
+async function runDiscoveryTaskGet(args: string[]): Promise<number> {
+  if (args.includes("--help") || args.includes("-h")) {
+    console.log("kweaver vega discovery-task get <id>");
+    return 0;
+  }
+
+  const { remaining, businessDomain, pretty } = parseCommonFlags(args);
+  const id = remaining.find((a) => !a.startsWith("-"));
+  if (!id) {
+    console.error("Usage: kweaver vega discovery-task get <id>");
+    return 1;
+  }
+
+  const token = await ensureValidToken();
+  const body = await getVegaDiscoverTask({
+    baseUrl: token.baseUrl,
+    accessToken: token.accessToken,
+    id,
     businessDomain,
   });
   console.log(formatCallOutput(body, pretty));

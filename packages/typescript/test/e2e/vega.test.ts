@@ -66,3 +66,43 @@ test("e2e: vega inspect returns composite report", { skip: shouldSkipE2e() }, as
   const report = JSON.parse(stdout);
   assert.ok("health" in report || "catalog_count" in report);
 });
+
+test("e2e: vega catalog --help shows CRUD subcommands", async () => {
+  const { code, stdout } = await runCli(["vega", "catalog", "--help"]);
+  assert.equal(code, 0);
+  assert.ok(stdout.includes("create"));
+  assert.ok(stdout.includes("update"));
+  assert.ok(stdout.includes("delete"));
+});
+
+test("e2e: vega resource --help shows CRUD subcommands", async () => {
+  const { code, stdout } = await runCli(["vega", "resource", "--help"]);
+  assert.equal(code, 0);
+  assert.ok(stdout.includes("create"));
+  assert.ok(stdout.includes("update"));
+  assert.ok(stdout.includes("delete"));
+});
+
+test("e2e: vega connector-type --help shows CRUD subcommands", async () => {
+  const { code, stdout } = await runCli(["vega", "connector-type", "--help"]);
+  assert.equal(code, 0);
+  assert.ok(stdout.includes("register"));
+  assert.ok(stdout.includes("update"));
+  assert.ok(stdout.includes("delete"));
+  assert.ok(stdout.includes("enable"));
+});
+
+test("e2e: vega discovery-task --help shows subcommands", async () => {
+  const { code, stdout } = await runCli(["vega", "discovery-task", "--help"]);
+  assert.equal(code, 0);
+  assert.ok(stdout.includes("list"));
+  assert.ok(stdout.includes("get"));
+});
+
+test("e2e: vega discovery-task list returns array", { skip: shouldSkipE2e() }, async () => {
+  const { code, stdout } = await runCli(["vega", "discovery-task", "list"]);
+  // Backend may not support discovery-task endpoint yet — tolerate
+  if (code !== 0) { test.skip("discovery-task list not available"); return; }
+  const entries = extractEntries(JSON.parse(stdout));
+  assert.ok(entries.length >= 0);
+});

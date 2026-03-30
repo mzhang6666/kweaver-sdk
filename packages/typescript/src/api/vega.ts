@@ -113,6 +113,75 @@ export async function getVegaCatalog(options: GetVegaCatalogOptions): Promise<st
   return body;
 }
 
+export interface CreateVegaCatalogOptions {
+  baseUrl: string;
+  accessToken: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function createVegaCatalog(options: CreateVegaCatalogOptions): Promise<string> {
+  const { baseUrl, accessToken, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/catalogs`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface UpdateVegaCatalogOptions {
+  baseUrl: string;
+  accessToken: string;
+  id: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function updateVegaCatalog(options: UpdateVegaCatalogOptions): Promise<string> {
+  const { baseUrl, accessToken, id, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/catalogs/${encodeURIComponent(id)}`;
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface DeleteVegaCatalogsOptions {
+  baseUrl: string;
+  accessToken: string;
+  ids: string;
+  businessDomain?: string;
+}
+
+export async function deleteVegaCatalogs(options: DeleteVegaCatalogsOptions): Promise<string> {
+  const { baseUrl, accessToken, ids, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/catalogs/${ids}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
 export interface VegaCatalogHealthStatusOptions {
   baseUrl: string;
   accessToken: string;
@@ -367,6 +436,74 @@ export async function queryVegaResourceData(options: QueryVegaResourceDataOption
   return body;
 }
 
+export interface CreateVegaResourceOptions {
+  baseUrl: string;
+  accessToken: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function createVegaResource(options: CreateVegaResourceOptions): Promise<string> {
+  const { baseUrl, accessToken, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/resources`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface UpdateVegaResourceOptions {
+  baseUrl: string;
+  accessToken: string;
+  id: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function updateVegaResource(options: UpdateVegaResourceOptions): Promise<string> {
+  const { baseUrl, accessToken, id, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/resources/${encodeURIComponent(id)}`;
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface DeleteVegaResourcesOptions {
+  baseUrl: string;
+  accessToken: string;
+  ids: string;
+  businessDomain?: string;
+}
+
+export async function deleteVegaResources(options: DeleteVegaResourcesOptions): Promise<string> {
+  const { baseUrl, accessToken, ids, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/resources/${ids}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
 
 // ---------------------------------------------------------------------------
 // Connector Types
@@ -430,6 +567,99 @@ export async function getVegaConnectorType(options: GetVegaConnectorTypeOptions)
   return body;
 }
 
+export interface RegisterVegaConnectorTypeOptions {
+  baseUrl: string;
+  accessToken: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function registerVegaConnectorType(options: RegisterVegaConnectorTypeOptions): Promise<string> {
+  const { baseUrl, accessToken, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/connector-types`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface UpdateVegaConnectorTypeOptions {
+  baseUrl: string;
+  accessToken: string;
+  type: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function updateVegaConnectorType(options: UpdateVegaConnectorTypeOptions): Promise<string> {
+  const { baseUrl, accessToken, type, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/connector-types/${encodeURIComponent(type)}`;
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface DeleteVegaConnectorTypeOptions {
+  baseUrl: string;
+  accessToken: string;
+  type: string;
+  businessDomain?: string;
+}
+
+export async function deleteVegaConnectorType(options: DeleteVegaConnectorTypeOptions): Promise<string> {
+  const { baseUrl, accessToken, type, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/connector-types/${encodeURIComponent(type)}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface SetVegaConnectorTypeEnabledOptions {
+  baseUrl: string;
+  accessToken: string;
+  type: string;
+  enabled: boolean;
+  businessDomain?: string;
+}
+
+export async function setVegaConnectorTypeEnabled(options: SetVegaConnectorTypeEnabledOptions): Promise<string> {
+  const { baseUrl, accessToken, type, enabled, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/connector-types/${encodeURIComponent(type)}/enabled`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: JSON.stringify({ enabled }),
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
 // ---------------------------------------------------------------------------
 // Discover Tasks
 // ---------------------------------------------------------------------------
@@ -468,5 +698,27 @@ export async function listVegaDiscoverTasks(options: ListVegaDiscoverTasksOption
   if (!response.ok) {
     throw new HttpError(response.status, response.statusText, body);
   }
+  return body;
+}
+
+export interface GetVegaDiscoverTaskOptions {
+  baseUrl: string;
+  accessToken: string;
+  id: string;
+  businessDomain?: string;
+}
+
+export async function getVegaDiscoverTask(options: GetVegaDiscoverTaskOptions): Promise<string> {
+  const { baseUrl, accessToken, id, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/discover-tasks/${encodeURIComponent(id)}`;
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
   return body;
 }

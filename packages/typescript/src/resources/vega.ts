@@ -2,6 +2,9 @@ import {
   vegaHealth,
   listVegaCatalogs,
   getVegaCatalog,
+  createVegaCatalog,
+  updateVegaCatalog,
+  deleteVegaCatalogs,
   vegaCatalogHealthStatus,
   testVegaCatalogConnection,
   discoverVegaCatalog,
@@ -9,9 +12,17 @@ import {
   listVegaResources,
   getVegaResource,
   queryVegaResourceData,
+  createVegaResource,
+  updateVegaResource,
+  deleteVegaResources,
   listVegaConnectorTypes,
   getVegaConnectorType,
+  registerVegaConnectorType,
+  updateVegaConnectorType,
+  deleteVegaConnectorType,
+  setVegaConnectorTypeEnabled,
   listVegaDiscoverTasks,
+  getVegaDiscoverTask,
 } from "../api/vega.js";
 import type { ClientContext } from "../client.js";
 
@@ -46,6 +57,27 @@ export class VegaResource {
   async getCatalog(id: string): Promise<unknown> {
     const raw = await getVegaCatalog({ ...this.ctx.base(), id });
     return JSON.parse(raw);
+  }
+
+  async createCatalog(data: {
+    name: string;
+    connector_type: string;
+    connector_config: Record<string, unknown>;
+    tags?: string[];
+    description?: string;
+  }): Promise<unknown> {
+    const raw = await createVegaCatalog({ ...this.ctx.base(), body: JSON.stringify(data) });
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  async updateCatalog(id: string, body: string): Promise<unknown> {
+    const raw = await updateVegaCatalog({ ...this.ctx.base(), id, body });
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  async deleteCatalogs(ids: string): Promise<unknown> {
+    const raw = await deleteVegaCatalogs({ ...this.ctx.base(), ids });
+    return raw ? JSON.parse(raw) : {};
   }
 
   async catalogHealthStatus(ids: string): Promise<unknown> {
@@ -94,6 +126,21 @@ export class VegaResource {
     return JSON.parse(raw);
   }
 
+  async createResource(body: string): Promise<unknown> {
+    const raw = await createVegaResource({ ...this.ctx.base(), body });
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  async updateResource(id: string, body: string): Promise<unknown> {
+    const raw = await updateVegaResource({ ...this.ctx.base(), id, body });
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  async deleteResources(ids: string): Promise<unknown> {
+    const raw = await deleteVegaResources({ ...this.ctx.base(), ids });
+    return raw ? JSON.parse(raw) : {};
+  }
+
   // ── Connector Types ─────────────────────────────────────────────────────────
 
   async listConnectorTypes(): Promise<unknown[]> {
@@ -106,10 +153,35 @@ export class VegaResource {
     return JSON.parse(raw);
   }
 
+  async registerConnectorType(body: string): Promise<unknown> {
+    const raw = await registerVegaConnectorType({ ...this.ctx.base(), body });
+    return JSON.parse(raw);
+  }
+
+  async updateConnectorType(type: string, body: string): Promise<unknown> {
+    const raw = await updateVegaConnectorType({ ...this.ctx.base(), type, body });
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  async deleteConnectorType(type: string): Promise<unknown> {
+    const raw = await deleteVegaConnectorType({ ...this.ctx.base(), type });
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  async setConnectorTypeEnabled(type: string, enabled: boolean): Promise<unknown> {
+    const raw = await setVegaConnectorTypeEnabled({ ...this.ctx.base(), type, enabled });
+    return raw ? JSON.parse(raw) : {};
+  }
+
   // ── Discover Tasks ──────────────────────────────────────────────────────────
 
   async listDiscoverTasks(opts: { status?: string; limit?: number; offset?: number } = {}): Promise<unknown[]> {
     const raw = await listVegaDiscoverTasks({ ...this.ctx.base(), ...opts });
     return unwrapArray(raw);
+  }
+
+  async getDiscoverTask(id: string): Promise<unknown> {
+    const raw = await getVegaDiscoverTask({ ...this.ctx.base(), id });
+    return JSON.parse(raw);
   }
 }
