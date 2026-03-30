@@ -56,6 +56,52 @@ test("vega.catalogHealthStatus handles comma-separated multi-ids in path", async
 
 // ── resource preview: endpoint does not exist on backend ───────────────────
 
+test("createVegaCatalog sends POST to /catalogs with JSON body", async () => {
+  const mock = mockFetch({ id: "new-cat-1" }, 201);
+  try {
+    const client = makeClient();
+    await client.vega.createCatalog({
+      name: "test-cat",
+      connector_type: "mysql",
+      connector_config: { host: "localhost" },
+    });
+    assert.equal(mock.calls[0].method, "POST");
+    const url = new URL(mock.calls[0].url);
+    assert.equal(url.pathname, "/api/vega-backend/v1/catalogs");
+    const body = JSON.parse(mock.calls[0].body!);
+    assert.equal(body.name, "test-cat");
+    assert.equal(body.connector_type, "mysql");
+  } finally {
+    mock.restore();
+  }
+});
+
+test("updateVegaCatalog sends PUT to /catalogs/:id", async () => {
+  const mock = mockFetch("{}", 200);
+  try {
+    const client = makeClient();
+    await client.vega.updateCatalog("cat-1", JSON.stringify({ name: "updated" }));
+    assert.equal(mock.calls[0].method, "PUT");
+    const url = new URL(mock.calls[0].url);
+    assert.equal(url.pathname, "/api/vega-backend/v1/catalogs/cat-1");
+  } finally {
+    mock.restore();
+  }
+});
+
+test("deleteVegaCatalogs sends DELETE to /catalogs/:ids", async () => {
+  const mock = mockFetch("{}", 200);
+  try {
+    const client = makeClient();
+    await client.vega.deleteCatalogs("cat-1,cat-2");
+    assert.equal(mock.calls[0].method, "DELETE");
+    const url = new URL(mock.calls[0].url);
+    assert.equal(url.pathname, "/api/vega-backend/v1/catalogs/cat-1,cat-2");
+  } finally {
+    mock.restore();
+  }
+});
+
 test("vega resource has no previewResource method (backend has no preview endpoint)", () => {
   const client = makeClient();
   assert.equal(

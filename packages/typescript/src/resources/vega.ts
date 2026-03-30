@@ -2,6 +2,9 @@ import {
   vegaHealth,
   listVegaCatalogs,
   getVegaCatalog,
+  createVegaCatalog,
+  updateVegaCatalog,
+  deleteVegaCatalogs,
   vegaCatalogHealthStatus,
   testVegaCatalogConnection,
   discoverVegaCatalog,
@@ -46,6 +49,27 @@ export class VegaResource {
   async getCatalog(id: string): Promise<unknown> {
     const raw = await getVegaCatalog({ ...this.ctx.base(), id });
     return JSON.parse(raw);
+  }
+
+  async createCatalog(data: {
+    name: string;
+    connector_type: string;
+    connector_config: Record<string, unknown>;
+    tags?: string[];
+    description?: string;
+  }): Promise<unknown> {
+    const raw = await createVegaCatalog({ ...this.ctx.base(), body: JSON.stringify(data) });
+    return JSON.parse(raw);
+  }
+
+  async updateCatalog(id: string, body: string): Promise<unknown> {
+    const raw = await updateVegaCatalog({ ...this.ctx.base(), id, body });
+    return raw ? JSON.parse(raw) : {};
+  }
+
+  async deleteCatalogs(ids: string): Promise<unknown> {
+    const raw = await deleteVegaCatalogs({ ...this.ctx.base(), ids });
+    return raw ? JSON.parse(raw) : {};
   }
 
   async catalogHealthStatus(ids: string): Promise<unknown> {

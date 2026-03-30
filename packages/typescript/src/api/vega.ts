@@ -113,6 +113,75 @@ export async function getVegaCatalog(options: GetVegaCatalogOptions): Promise<st
   return body;
 }
 
+export interface CreateVegaCatalogOptions {
+  baseUrl: string;
+  accessToken: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function createVegaCatalog(options: CreateVegaCatalogOptions): Promise<string> {
+  const { baseUrl, accessToken, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/catalogs`;
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface UpdateVegaCatalogOptions {
+  baseUrl: string;
+  accessToken: string;
+  id: string;
+  body: string;
+  businessDomain?: string;
+}
+
+export async function updateVegaCatalog(options: UpdateVegaCatalogOptions): Promise<string> {
+  const { baseUrl, accessToken, id, body: requestBody, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/catalogs/${encodeURIComponent(id)}`;
+
+  const response = await fetch(url, {
+    method: "PUT",
+    headers: { ...buildHeaders(accessToken, businessDomain), "content-type": "application/json" },
+    body: requestBody,
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
+export interface DeleteVegaCatalogsOptions {
+  baseUrl: string;
+  accessToken: string;
+  ids: string;
+  businessDomain?: string;
+}
+
+export async function deleteVegaCatalogs(options: DeleteVegaCatalogsOptions): Promise<string> {
+  const { baseUrl, accessToken, ids, businessDomain = "bd_public" } = options;
+  const base = baseUrl.replace(/\/+$/, "");
+  const url = `${base}${VEGA_BASE}/catalogs/${ids}`;
+
+  const response = await fetch(url, {
+    method: "DELETE",
+    headers: buildHeaders(accessToken, businessDomain),
+  });
+
+  const body = await response.text();
+  if (!response.ok) throw new HttpError(response.status, response.statusText, body);
+  return body;
+}
+
 export interface VegaCatalogHealthStatusOptions {
   baseUrl: string;
   accessToken: string;
